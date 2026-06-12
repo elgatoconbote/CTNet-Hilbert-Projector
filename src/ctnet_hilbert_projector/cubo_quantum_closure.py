@@ -29,3 +29,6 @@ def align_global_phase(candidate: torch.Tensor, reference: torch.Tensor) -> torc
     r = r / r.norm(dim=-1, keepdim=True).clamp_min(1e-15)
     overlap = (c.conj() * r).sum(dim=-1, keepdim=True)
     return c * (overlap / overlap.abs().clamp_min(1e-15))
+
+
+CUBO_QUANTUM_CLOSURE_ROUTE = "residual -> cubo6d -> omega_q -> gates -> Q_sigma(Xi)"
