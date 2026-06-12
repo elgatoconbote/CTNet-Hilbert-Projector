@@ -35,6 +35,8 @@ class ThesisDynamicsConfig:
     cocycle_strength: float = 0.25
     hamiltonian_state_strength: float = 0.05
     hamiltonian_phase_strength: float = 1.0
+    hamiltonian_mass_strength: float = 0.0
+    cardinal_mass_strength: float = 0.0
     mass_feedback_strength: float = 0.05
     coherence_feedback_strength: float = 0.02
     atlas_strength: float = 0.20
@@ -71,6 +73,7 @@ class ThesisProjection:
     branch_features: torch.Tensor | None = None
     coherence_tensor: CoherenceTensorState | None = None
     atlas_gauge: torch.Tensor | None = None
+    mass_contrast: torch.Tensor | None = None
 
     def as_hilbert_projection(self) -> HilbertProjection:
         return HilbertProjection(
@@ -116,6 +119,10 @@ def _center_scale(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     if bool(s < eps):
         return torch.zeros_like(x)
     return y / s.clamp_min(eps)
+
+
+def _center_by_branch(x: torch.Tensor) -> torch.Tensor:
+    return x - x.mean(dim=-1, keepdim=True)
 
 
 def branch_matrix(branches: Sequence[UPBranch], *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
@@ -183,12 +190,7 @@ def branch_atlas_gauge(
     H: torch.Tensor | None,
     config: ThesisDynamicsConfig,
 ) -> torch.Tensor:
-    """Atlas gauge: branch-specific chart pressure from C6, M, R and H.
-
-    This is deterministic and state-derived. It prevents branches that share only
-    coarse active count from collapsing into the same chart while preserving u/p
-    as a modal atlas rather than a binary code.
-    """
+    """Atlas gauge: branch-specific chart pressure from C6, M, R and H."""
     dtype, device = state.z.dtype, state.z.device
     n = bmat.shape[-1]
     mem_vec = _match_dim(state.memory.mean(dim=1), n)
@@ -329,22 +331,9 @@ def branch_feature_tensor(
     omega = omega_global.expand_as(z_proj)
     clos = closure.expand_as(z_proj)
     phi = torch.stack([
-        z_proj,
-        m_proj,
-        r_proj,
-        diag,
-        coupling,
-        phase_drive,
-        clos,
-        omega,
-        activity,
-        pair_signature,
-        transition_density,
-        boundary_signature,
-        position_sine,
-        position_cosine,
-        oriented_ramp,
-        parity_signature,
+        z_proj, m_proj, r_proj, diag, coupling, phase_drive, clos, omega,
+        activity, pair_signature, transition_density, boundary_signature,
+        position_sine, position_cosine, oriented_ramp, parity_signature,
     ], dim=-1)
     if phi.shape[-1] != config.feature_dim:
         phi = _match_dim(phi, config.feature_dim)
@@ -391,6 +380,32 @@ def coherence_from_tensor(phi: torch.Tensor, K: CoherenceTensorState) -> torch.T
     return (diag_part + low_part) / (float(phi.shape[-1]) ** 0.5)
 
 
+def hamiltonian_mass_contrast(phi: torch.Tensor, atlas: torch.Tensor, config: ThesisDynamicsConfig) -> torch.Tensor:
+    """Branch mass contrast forced by Hamiltonian and cardinal signatures.
+
+    This is not a target-vector fit. It uses only branch-local H descriptors and
+    u/p atlas signatures already contained in phi. It exists because phase-only
+    H coupling can keep Born masses nearly flat even when exact projected dynamics
+    develops a non-flat probability profile.
+    """
+    h_energy = _center_by_branch(phi[..., 3])
+    h_coupling = _center_by_branch(phi[..., 4])
+    h_phase = _center_by_branch(phi[..., 5])
+    cardinal = _center_by_branch(
+        0.45 * phi[..., 8]
+        + 0.85 * phi[..., 9]
+        - 0.55 * phi[..., 10]
+        + 0.25 * phi[..., 11]
+        + 0.45 * phi[..., 12]
+        + 0.45 * phi[..., 13]
+        + 0.25 * phi[..., 14]
+        + 0.20 * phi[..., 15]
+    )
+    h_drive = torch.tanh(h_energy + 0.75 * h_coupling + 0.50 * h_phase)
+    c_drive = torch.tanh(cardinal + 0.5 * _center_by_branch(atlas))
+    return config.hamiltonian_mass_strength * h_drive + config.cardinal_mass_strength * c_drive
+
+
 def thesis_project(
     omega_core: FoldedCTNetOmegaCubo26,
     state: FoldedOmegaCuboState,
@@ -408,6 +423,7 @@ def thesis_project(
     memory = torch.sigmoid(m_proj + config.memory_branch_strength * atlas)
     relation = torch.sigmoid(r_proj + config.relation_branch_strength * atlas)
     residue = torch.relu(phi[..., 7] + 0.1 * torch.tanh(-z_proj) - 0.05 * atlas)
+    mass_contrast = hamiltonian_mass_contrast(phi, atlas, config)
 
     mass_log = (
         config.beta_coherence * coherence
@@ -416,11 +432,12 @@ def thesis_project(
         + config.eta_memory * memory
         + cocycle
         + atlas
+        + mass_contrast
     )
     masses = torch.exp(mass_log.clamp(-config.coherence_clamp, config.coherence_clamp)) + config.eps
     probabilities = masses / masses.sum(dim=-1, keepdim=True).clamp_min(config.eps)
 
-    reversible_action = z_proj + r_proj + 0.5 * m_proj + 0.25 * coherence + cocycle + atlas
+    reversible_action = z_proj + r_proj + 0.5 * m_proj + 0.25 * coherence + cocycle + atlas + 0.20 * mass_contrast
     phases = torch.tanh(reversible_action) - float(dt) * config.hamiltonian_phase_strength * phase_drive
     amplitudes = torch.sqrt(probabilities).to(torch.complex64) * torch.exp(1j * phases.to(torch.complex64))
     normalization_error = (probabilities.sum(dim=-1) - 1.0).abs()
@@ -439,6 +456,7 @@ def thesis_project(
         branch_features=phi,
         coherence_tensor=K,
         atlas_gauge=atlas,
+        mass_contrast=mass_contrast,
     )
 
 
@@ -456,17 +474,19 @@ def feedback_state_with_mass(
     coh = projection.coherence.to(dtype=state.z.dtype)
     res = projection.residue.to(dtype=state.z.dtype)
     atlas = projection.atlas_gauge.to(dtype=state.z.dtype) if projection.atlas_gauge is not None else torch.zeros_like(prob)
+    mass_contrast = projection.mass_contrast.to(dtype=state.z.dtype) if projection.mass_contrast is not None else torch.zeros_like(prob)
 
     mass_moment = torch.einsum("bs,sn->bn", mass_center, bmat)
     phase_moment = torch.einsum("bs,sn->bn", prob * phase_sin, bmat)
     coh_moment = torch.einsum("bs,sn->bn", prob * coh, bmat)
     res_moment = torch.einsum("bs,sn->bn", prob * res, bmat)
     atlas_moment = torch.einsum("bs,sn->bn", prob * atlas, bmat)
+    contrast_moment = torch.einsum("bs,sn->bn", prob * mass_contrast, bmat)
     rel_moment = torch.einsum("bs,sn->bn", prob * projection.cocycle.to(dtype=state.z.dtype), bmat)
 
-    z_drive = mass_moment + 0.5 * phase_moment + config.coherence_feedback_strength * coh_moment + 0.25 * atlas_moment
-    m_drive = 0.5 * mass_moment + 0.5 * coh_moment - 0.25 * res_moment + 0.25 * atlas_moment
-    r_drive = rel_moment + 0.25 * phase_moment + 0.5 * atlas_moment
+    z_drive = mass_moment + 0.5 * phase_moment + config.coherence_feedback_strength * coh_moment + 0.25 * atlas_moment + 0.30 * contrast_moment
+    m_drive = 0.5 * mass_moment + 0.5 * coh_moment - 0.25 * res_moment + 0.25 * atlas_moment + 0.25 * contrast_moment
+    r_drive = rel_moment + 0.25 * phase_moment + 0.5 * atlas_moment + 0.35 * contrast_moment
 
     z_delta = _match_dim(z_drive, state.z.shape[-1]).unsqueeze(1).expand_as(state.z)
     m_delta = _match_dim(m_drive, state.memory.shape[-1]).unsqueeze(1).expand_as(state.memory)
@@ -476,7 +496,8 @@ def feedback_state_with_mass(
     stats = torch.stack([
         prob.mean(dim=-1), prob.std(dim=-1), projection.masses.mean(dim=-1), projection.masses.std(dim=-1),
         projection.phases.mean(dim=-1), projection.phases.std(dim=-1), projection.coherence.mean(dim=-1),
-        projection.residue.mean(dim=-1), projection.cocycle.abs().mean(dim=-1), phase_cos.mean(dim=-1), atlas.abs().mean(dim=-1), atlas.std(dim=-1),
+        projection.residue.mean(dim=-1), projection.cocycle.abs().mean(dim=-1), phase_cos.mean(dim=-1),
+        atlas.abs().mean(dim=-1), atlas.std(dim=-1), mass_contrast.mean(dim=-1), mass_contrast.std(dim=-1),
     ], dim=-1).to(dtype=state.cubo.dtype)
     width = min(c_delta.shape[-1], stats.shape[-1])
     c_delta[:, :width] = stats[:, :width]
