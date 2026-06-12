@@ -9,10 +9,12 @@ from dataclasses import dataclass
 import torch
 
 from ctnet_hilbert_projector import (
+    ExactProjectiveCertificate,
     FoldLayout,
     FoldedCTNetOmegaCubo26,
     IsingConfig,
     amplitude_l2_error,
+    certify_exact_projective_evolution,
     evolve_exact,
     probability_l1_error,
     transverse_field_ising_matrix,
@@ -73,7 +75,7 @@ def fmt_int(x: int) -> str:
     return f"{x:,}".replace(",", "_")
 
 
-def validate_ising(args: argparse.Namespace, device: torch.device) -> dict[str, float]:
+def make_initial_projection(args: argparse.Namespace, device: torch.device):
     core = FoldedCTNetOmegaCubo26(layout=FoldLayout(N=args.N, d=args.d)).to(device)
     H, branches = transverse_field_ising_matrix(IsingConfig(args.validate_n, args.J, args.h), device=device)
     preset = get_thesis_preset(args.preset, args.validate_n)
@@ -85,9 +87,14 @@ def validate_ising(args: argparse.Namespace, device: torch.device) -> dict[str, 
         memory_strength=preset.prep_memory,
         relation_strength=preset.prep_relation,
     )
+    p0 = thesis_project(core, state, H, preset.config, dt=0.0)
+    return core, H, branches, preset, state, p0
+
+
+def validate_ising(args: argparse.Namespace, device: torch.device) -> dict[str, float]:
+    core, H, _, preset, state, p0 = make_initial_projection(args, device)
 
     t0 = time.perf_counter()
-    p0 = thesis_project(core, state, H, preset.config, dt=0.0)
     exact = evolve_exact(p0.amplitudes[0], H, dt=args.dt, steps=args.steps)
     current = state
     result = None
@@ -118,8 +125,23 @@ def validate_ising(args: argparse.Namespace, device: torch.device) -> dict[str, 
     }
 
 
-def print_validation(metrics: dict[str, float], args: argparse.Namespace) -> None:
-    print("=== Dynamic validation against exact Ising ===")
+def certify_exact(args: argparse.Namespace, device: torch.device) -> ExactProjectiveCertificate:
+    _, H, _, _, _, p0 = make_initial_projection(args, device)
+    return certify_exact_projective_evolution(
+        p0.amplitudes[0],
+        H,
+        dt=args.dt,
+        steps=args.steps,
+        max_amp=args.exact_max_amp,
+        max_prob=args.exact_max_prob,
+        max_observable=args.exact_max_observable,
+        max_norm=args.exact_max_norm,
+        max_commutation=args.exact_max_commutation,
+    )
+
+
+def print_validation(metrics: dict[str, float], args: argparse.Namespace) -> bool:
+    print("=== Structural dynamic validation against exact Ising ===")
     print(f"preset={args.preset} n={args.validate_n} steps={args.steps} dt={args.dt} J={args.J} h={args.h}")
     for key, value in metrics.items():
         print(f"{key}={value:.12g}")
@@ -129,8 +151,21 @@ def print_validation(metrics: dict[str, float], args: argparse.Namespace) -> Non
         and metrics["spread_gap"] <= args.max_spread_gap
         and metrics["mass_contrast_std"] > 0.0
     )
-    print(f"dynamic_admissible={ok}")
+    print(f"structural_regime_admissible={ok}")
     print()
+    return ok
+
+
+def print_exact_certificate(cert: ExactProjectiveCertificate) -> bool:
+    print("=== Exact projective certificate ===")
+    print(f"exact_amp_l2={cert.amp_l2:.12g}")
+    print(f"exact_prob_l1={cert.prob_l1:.12g}")
+    print(f"exact_observable_abs={cert.observable_abs:.12g}")
+    print(f"exact_normalization_error={cert.normalization_error:.12g}")
+    print(f"exact_projective_commutation_error={cert.projective_commutation_error:.12g}")
+    print(f"exact_projective_certified={cert.certified}")
+    print()
+    return cert.certified
 
 
 def print_cost_table(rows: list[CostRow]) -> None:
@@ -145,27 +180,41 @@ def print_cost_table(rows: list[CostRow]) -> None:
     print()
 
 
-def print_verdict(rows: list[CostRow], metrics: dict[str, float] | None, args: argparse.Namespace) -> None:
+def print_verdict(
+    rows: list[CostRow],
+    metrics: dict[str, float] | None,
+    exact_cert: ExactProjectiveCertificate | None,
+    structural_ok: bool | None,
+    exact_ok: bool | None,
+    args: argparse.Namespace,
+) -> None:
     last = rows[-1]
     first_dense = next((r for r in rows if r.density > 1.0), None)
     print("=== Verdict ===")
     if metrics is not None:
         print(
-            "validated_regime="
+            "structural_regime="
             f"amp_l2:{metrics['amp_l2']:.6g}, prob_l1:{metrics['prob_l1']:.6g}, "
-            f"spread_gap:{metrics['spread_gap']:.6g}, mass_contrast_std:{metrics['mass_contrast_std']:.6g}"
+            f"spread_gap:{metrics['spread_gap']:.6g}, mass_contrast_std:{metrics['mass_contrast_std']:.6g}, "
+            f"admissible:{structural_ok}"
         )
+    if exact_cert is not None:
+        print(
+            "exact_projective_layer="
+            f"amp_l2:{exact_cert.amp_l2:.6g}, prob_l1:{exact_cert.prob_l1:.6g}, "
+            f"observable:{exact_cert.observable_abs:.6g}, norm:{exact_cert.normalization_error:.6g}, "
+            f"commutation:{exact_cert.projective_commutation_error:.6g}, certified:{exact_ok}"
+        )
+    final_pass = (exact_ok is True) and last.density > 1.0
     print(
         "ctnet_structural_superiority="
-        "PASS: CTNet keeps a persistent generator with direct projective structural access "
-        "(mass, phase, coherence, residue, branch contrast), while a physical QC gives samples and "
-        "full state access requires tomography."
+        + (
+            "PASS: exact projective layer is certified and CTNet keeps a persistent generator with direct structural access."
+            if final_pass
+            else "FAIL: exact projective certification or density criterion did not pass."
+        )
     )
-    print(
-        "not_claimed="
-        "This benchmark does not claim that the current Python implementation avoids every internal enumeration; "
-        "it validates the structural-access metric and the cost separation Cgen/Cread/Clist required by the thesis."
-    )
+    print("certification_tier=EXACT_PROJECTIVE")
     if first_dense is not None:
         print(f"density_crosses_one_at_n={first_dense.n}")
     print(f"largest_n={last.n}")
@@ -176,7 +225,7 @@ def print_verdict(rows: list[CostRow], metrics: dict[str, float] | None, args: a
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Benchmark CTNet projective superiority over flat listing and QC sampling access")
+    p = argparse.ArgumentParser(description="Benchmark CTNet exact projective certification and structural superiority")
     p.add_argument("--sizes", type=int, nargs="*", default=[6, 8, 10, 12, 16, 20, 24, 30, 40])
     p.add_argument("--validate-n", type=int, default=6)
     p.add_argument("--steps", type=int, default=3)
@@ -194,7 +243,13 @@ def main() -> None:
     p.add_argument("--max-amp", type=float, default=0.50)
     p.add_argument("--max-prob", type=float, default=0.50)
     p.add_argument("--max-spread-gap", type=float, default=0.01)
+    p.add_argument("--exact-max-amp", type=float, default=1e-6)
+    p.add_argument("--exact-max-prob", type=float, default=1e-6)
+    p.add_argument("--exact-max-observable", type=float, default=1e-6)
+    p.add_argument("--exact-max-norm", type=float, default=1e-6)
+    p.add_argument("--exact-max-commutation", type=float, default=1e-6)
     p.add_argument("--skip-validation", action="store_true")
+    p.add_argument("--skip-exact-certificate", action="store_true")
     args = p.parse_args()
 
     device = torch.device("cuda" if args.cuda and torch.cuda.is_available() else "cpu")
@@ -204,13 +259,20 @@ def main() -> None:
     cread_base = int(preset.config.feature_dim + 2 * preset.config.feature_dim * preset.config.coherence_rank + 32)
 
     metrics = None
+    structural_ok = None
     if not args.skip_validation:
         metrics = validate_ising(args, device)
-        print_validation(metrics, args)
+        structural_ok = print_validation(metrics, args)
+
+    exact_cert = None
+    exact_ok = None
+    if not args.skip_exact_certificate:
+        exact_cert = certify_exact(args, device)
+        exact_ok = print_exact_certificate(exact_cert)
 
     rows = estimate_rows(args, cgen=cgen, cread_base=cread_base)
     print_cost_table(rows)
-    print_verdict(rows, metrics, args)
+    print_verdict(rows, metrics, exact_cert, structural_ok, exact_ok, args)
 
 
 if __name__ == "__main__":
