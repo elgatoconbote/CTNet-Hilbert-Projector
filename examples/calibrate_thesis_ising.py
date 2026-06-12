@@ -28,6 +28,8 @@ class Candidate:
     mass_feedback: float
     phase_strength: float
     state_strength: float
+    hamiltonian_mass: float
+    cardinal_mass: float
     beta: float
     gamma: float
 
@@ -46,6 +48,8 @@ def evaluate(args: argparse.Namespace, cand: Candidate, device: torch.device) ->
         gamma_residue=cand.gamma,
         hamiltonian_state_strength=cand.state_strength,
         hamiltonian_phase_strength=cand.phase_strength,
+        hamiltonian_mass_strength=cand.hamiltonian_mass,
+        cardinal_mass_strength=cand.cardinal_mass,
         mass_feedback_strength=cand.mass_feedback,
         atlas_strength=cand.atlas_strength,
     )
@@ -68,18 +72,26 @@ def evaluate(args: argparse.Namespace, cand: Candidate, device: torch.device) ->
     amp = amplitude_l2_error(exact, proj.amplitudes[0], phase_invariant=True)
     prob = probability_l1_error(exact, proj.amplitudes[0])
     top = torch.topk(proj.probabilities[0].detach(), k=min(args.topk, proj.probabilities.shape[-1])).values
+    exact_prob = exact.abs().pow(2)
+    exact_top = torch.topk(exact_prob.detach(), k=min(args.topk, exact_prob.shape[-1])).values
     spread = (top.max() - top.min()).detach()
-    loss = amp + args.prob_weight * prob - args.spread_weight * spread
+    exact_spread = (exact_top.max() - exact_top.min()).detach()
+    spread_gap = (spread - exact_spread).abs()
+    mass_contrast_std = proj.mass_contrast.std().detach() if proj.mass_contrast is not None else torch.zeros((), device=device)
+    loss = amp + args.prob_weight * prob + args.spread_gap_weight * spread_gap - args.spread_weight * spread
     return {
         "loss": float(loss.detach().cpu()),
         "amp_l2": float(amp.detach().cpu()),
         "prob_l1": float(prob.detach().cpu()),
         "top_spread": float(spread.cpu()),
+        "top_spread_exact": float(exact_spread.cpu()),
+        "spread_gap": float(spread_gap.cpu()),
         "coh_mean": float(proj.coherence.mean().detach().cpu()),
         "coh_std": float(proj.coherence.std().detach().cpu()),
         "mem_std": float(proj.memory.std().detach().cpu()),
         "rel_std": float(proj.relation.std().detach().cpu()),
         "atlas_std": float(proj.atlas_gauge.std().detach().cpu()) if proj.atlas_gauge is not None else 0.0,
+        "mass_contrast_std": float(mass_contrast_std.cpu()),
     }
 
 
@@ -96,12 +108,15 @@ def main() -> None:
     p.add_argument("--topk", type=int, default=10)
     p.add_argument("--prob-weight", type=float, default=0.25)
     p.add_argument("--spread-weight", type=float, default=0.0)
+    p.add_argument("--spread-gap-weight", type=float, default=1.0)
     p.add_argument("--prep-memory", default="0.2,0.4,0.8")
     p.add_argument("--prep-relation", default="0.25,0.6,1.0")
     p.add_argument("--atlas", default="0.1,0.2,0.4")
     p.add_argument("--mass-feedback", default="0.02,0.05,0.1")
     p.add_argument("--phase-strength", default="0.5,1.0,1.5")
     p.add_argument("--state-strength", default="0.02,0.05,0.1")
+    p.add_argument("--hamiltonian-mass", default="0.0,0.5,1.0")
+    p.add_argument("--cardinal-mass", default="0.0,0.25,0.5")
     p.add_argument("--beta", default="0.5,1.0,1.5")
     p.add_argument("--gamma", default="0.5,1.0")
     args = p.parse_args()
@@ -114,6 +129,8 @@ def main() -> None:
         parse_grid(args.mass_feedback),
         parse_grid(args.phase_strength),
         parse_grid(args.state_strength),
+        parse_grid(args.hamiltonian_mass),
+        parse_grid(args.cardinal_mass),
         parse_grid(args.beta),
         parse_grid(args.gamma),
     ]
