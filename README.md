@@ -30,7 +30,7 @@ CTNet                -> estado generador con acceso estructural interno
 
 ## Formulación computacional
 
-El repositorio representa estados cuánticos mediante una carta CTNet persistente, no mediante una lista extensional de amplitudes. El objeto central es:
+El repositorio representa estados cuánticos mediante una carta CTNet persistente, no mediante una lista explícita de amplitudes. El objeto central es:
 
 ```text
 Xi = pack(Z, M, R, C6, pad)
@@ -92,7 +92,7 @@ Para `n` qubits, el número de amplitudes de la base es:
 N_amp(n) = 2^n
 ```
 
-Un listado extensional completo exige:
+Un listado completo de todas las amplitudes exige:
 
 ```text
 C_list(n) >= 2^n
@@ -153,7 +153,7 @@ frente a listado, y por:
 
 frente a tomografía completa.
 
-En el límite infinito, el listado y la tomografía divergen como operaciones extensionales. CTNet conserva el vector como ley proyectiva:
+En el límite infinito, el listado y la tomografía divergen como operaciones de enumeración completa. CTNet conserva el vector como ley proyectiva:
 
 ```text
 sigma -> Q_sigma(Xi)
