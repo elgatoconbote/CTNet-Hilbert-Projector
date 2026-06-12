@@ -48,17 +48,15 @@ A_t(sigma) = Q_sigma(Xi_t)
 
 La sustitución no depende del número finito de ramas. La lista finita, la serie infinita y la integral funcional son despliegues externos de una misma estructura: una ley proyectiva generada por `Xi_t`.
 
-## Teorema de sustitución universal CTNet
+## Sustitución estructural
 
-Sea `Q` cualquier proceso cuántico físico, finito o infinito, discreto o continuo, de dimensión finita, infinita numerable o funcional. Si `Q` define un estado cuántico como ley de amplitud sobre una base, CTNet lo representa mediante un estado persistente `Xi` y una familia completa de lecturas `Q_sigma` tal que:
+Para un proceso cuántico `Q` que define una ley de amplitud sobre una base, CTNet representa esa ley mediante un estado persistente `Xi` y una familia de lecturas `Q_sigma`.
 
 ```text
 Q_sigma(Xi) = psi(sigma)
 ```
 
-para toda rama, carta o modo `sigma`.
-
-En consecuencia, CTNet reproduce:
+La misma carta permite representar:
 
 ```text
 estado
@@ -70,7 +68,7 @@ distribuciones de medición
 dinámica proyectada
 ```
 
-y conserva además la estructura generadora:
+y conserva además estructura interna:
 
 ```text
 masa modal
@@ -83,7 +81,7 @@ cierre
 régimen
 ```
 
-Por tanto, CTNet no es sólo una simulación externa del procesador cuántico: es un régimen computacional más fuerte que contiene sus salidas y añade acceso estructural interno al estado.
+Por tanto, CTNet no se limita a reproducir una salida muestral. Mantiene un estado generador desde el que se leen amplitudes, fases, masas y relaciones como estructura interna.
 
 ## Por qué CTNet supera al procesador cuántico físico
 
