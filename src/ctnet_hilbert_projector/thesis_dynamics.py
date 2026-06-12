@@ -14,7 +14,7 @@ This module implements the paper thesis as executable mechanics:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -77,6 +77,14 @@ def _match_dim(x: torch.Tensor, dim: int) -> torch.Tensor:
     return x[..., :dim]
 
 
+def _center_scale(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    y = x - x.mean()
+    s = y.std()
+    if bool(s < eps):
+        return torch.zeros_like(x)
+    return y / s.clamp_min(eps)
+
+
 def branch_matrix(branches: Sequence[UPBranch], *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     return torch.stack([branch_to_tensor(branch, device=device, dtype=dtype) for branch in branches], dim=0)
 
@@ -90,6 +98,26 @@ def hamiltonian_branch_descriptors(H: torch.Tensor) -> Tuple[torch.Tensor, torch
     coupling = off.abs().sum(dim=-1).real
     phase_drive = diag + off.real.sum(dim=-1)
     return diag, coupling, phase_drive
+
+
+def _pair_drive(weights: torch.Tensor, bmat: torch.Tensor) -> torch.Tensor:
+    """Fold pair structure into site coordinates.
+
+    Linear branch averages can cancel for symmetric Hamiltonians. Pair products
+    keep the Z_i Z_j content visible to the fixed CTNet chart.
+    """
+    n = bmat.shape[-1]
+    out = torch.zeros(n, device=bmat.device, dtype=bmat.dtype)
+    count = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            val = (weights * bmat[:, i] * bmat[:, j]).mean()
+            out[i] = out[i] + val
+            out[j] = out[j] + val
+            count += 1
+    if count:
+        out = out / float(count)
+    return out
 
 
 def condition_state_with_hamiltonian(
@@ -107,18 +135,37 @@ def condition_state_with_hamiltonian(
     phase_drive = phase_drive.to(dtype=dtype)
     bmat = branch_matrix(branches, device=device, dtype=dtype)
 
-    diag_n = (diag - diag.mean()) / diag.std().clamp_min(1e-6)
-    coup_n = (coupling - coupling.mean()) / coupling.std().clamp_min(1e-6)
-    phase_n = (phase_drive - phase_drive.mean()) / phase_drive.std().clamp_min(1e-6)
+    diag_n = _center_scale(diag)
+    coup_n = _center_scale(coupling)
+    phase_n = _center_scale(phase_drive)
 
-    modal_drive = torch.einsum("s,sn->n", diag_n + 0.5 * coup_n, bmat) / float(len(branches))
-    rel_drive = torch.einsum("s,sn->n", phase_n, bmat) / float(len(branches))
+    linear_drive = torch.einsum("s,sn->n", diag_n + 0.5 * coup_n + 0.25 * phase_n, bmat) / float(len(branches))
+    pair_diag = _pair_drive(diag_n, bmat)
+    pair_phase = _pair_drive(phase_n + 0.5 * coup_n, bmat)
+
+    n = bmat.shape[-1]
+    global_scale = H.real.abs().mean().to(dtype=dtype).clamp_min(1e-6)
+    global_pattern_n = torch.linspace(-1.0, 1.0, n, device=device, dtype=dtype) * global_scale
+
+    modal_drive = linear_drive + pair_diag + 0.1 * global_pattern_n
+    rel_drive = pair_phase + 0.5 * linear_drive + 0.05 * torch.flip(global_pattern_n, dims=[0])
+    mem_drive = 0.5 * modal_drive + 0.25 * rel_drive
 
     z_delta = _match_dim(modal_drive, state.z.shape[-1]).view(1, 1, -1).expand_as(state.z)
     r_delta = _match_dim(rel_drive, state.relations.shape[-1]).view(1, 1, -1).expand_as(state.relations)
-    m_delta = 0.5 * _match_dim(modal_drive, state.memory.shape[-1]).view(1, 1, -1).expand_as(state.memory)
+    m_delta = _match_dim(mem_drive, state.memory.shape[-1]).view(1, 1, -1).expand_as(state.memory)
     c_delta = torch.zeros_like(state.cubo)
-    c_stats = torch.stack([diag_n.mean(), diag_n.std(), coup_n.mean(), coup_n.std(), phase_n.mean(), phase_n.std()])
+    c_stats = torch.stack([
+        diag_n.mean(),
+        diag_n.std(),
+        coup_n.mean(),
+        coup_n.std(),
+        phase_n.mean(),
+        phase_n.std(),
+        pair_diag.abs().mean(),
+        pair_phase.abs().mean(),
+        global_scale,
+    ])
     c_delta[:, : min(c_delta.shape[-1], c_stats.numel())] = c_stats[: c_delta.shape[-1]]
 
     alpha = float(strength)
