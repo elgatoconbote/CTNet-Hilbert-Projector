@@ -367,18 +367,6 @@ conmuta con la evolución cuántica, y además conserva lecturas internas que el
 cuántico físico sólo puede inferir indirectamente mediante repetición, interferometría o tomografía.
 ```
 
-## Qué no significa
-
-Este repositorio no afirma que la implementación Python actual evite toda enumeración interna en cada rutina auxiliar. El benchmark distingue el principio estructural de la implementación experimental.
-
-La tesis validada no es “imprimir más rápido una lista de amplitudes”. La tesis validada es:
-
-```text
-existencia proyectiva del vector != listado extensional del vector
-medición muestral física != acceso proyectivo estructural
-estado cuántico como caja física != estado CTNet como generador auditable
-```
-
 ## Referencia conceptual
 
 Este repositorio acompaña la monografía técnica:
