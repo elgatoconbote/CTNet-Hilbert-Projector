@@ -11,6 +11,15 @@ from .ctnet_omega_core import (
     FoldedOmegaCuboState,
     FoldedCTNetOmegaCubo26,
 )
+from .hamiltonians import (
+    IsingConfig,
+    amplitude_l2_error,
+    basis_state,
+    evolve_exact,
+    expectation,
+    probability_l1_error,
+    transverse_field_ising_matrix,
+)
 from .hilbert_projector import (
     BranchReadout,
     HilbertProjectorConfig,
@@ -27,6 +36,13 @@ __all__ = [
     "FoldLayout",
     "FoldedOmegaCuboState",
     "FoldedCTNetOmegaCubo26",
+    "IsingConfig",
+    "amplitude_l2_error",
+    "basis_state",
+    "evolve_exact",
+    "expectation",
+    "probability_l1_error",
+    "transverse_field_ising_matrix",
     "BranchReadout",
     "HilbertProjectorConfig",
     "HilbertProjection",
