@@ -21,7 +21,6 @@ from ctnet_hilbert_projector import (
 )
 from ctnet_hilbert_projector.presets import get_thesis_preset
 from ctnet_hilbert_projector.state_preparation import prepare_quantum_atlas_state
-from ctnet_hilbert_projector.structural_closure import close_structural_residue_to_target
 from ctnet_hilbert_projector.thesis_dynamics import thesis_project, thesis_quantum_step
 
 
@@ -103,35 +102,25 @@ def validate_ising(args: argparse.Namespace, device: torch.device) -> dict[str, 
         current = result.next_state
     elapsed = time.perf_counter() - t0
 
-    raw_proj = result.projection
-    closed_proj = close_structural_residue_to_target(raw_proj, exact)
-
-    top_ct = torch.topk(raw_proj.probabilities[0].detach(), k=min(args.topk, raw_proj.probabilities.shape[-1])).values
+    proj = result.projection
+    top_ct = torch.topk(proj.probabilities[0].detach(), k=min(args.topk, proj.probabilities.shape[-1])).values
     exact_prob = exact.abs().pow(2)
     top_exact = torch.topk(exact_prob.detach(), k=min(args.topk, exact_prob.shape[-1])).values
     top_spread_ct = top_ct.max() - top_ct.min()
     top_spread_exact = top_exact.max() - top_exact.min()
 
-    structural_exact_amp = amplitude_l2_error(exact.to(torch.complex128), closed_proj.amplitudes[0], phase_invariant=True)
-    structural_exact_prob = probability_l1_error(exact.to(torch.complex128), closed_proj.amplitudes[0])
-    structural_residue_max = closed_proj.residue.abs().max()
-
     return {
         "elapsed_s": elapsed,
-        "amp_l2": float(amplitude_l2_error(exact, raw_proj.amplitudes[0], phase_invariant=True).detach().cpu()),
-        "prob_l1": float(probability_l1_error(exact, raw_proj.amplitudes[0]).detach().cpu()),
+        "amp_l2": float(amplitude_l2_error(exact, proj.amplitudes[0], phase_invariant=True).detach().cpu()),
+        "prob_l1": float(probability_l1_error(exact, proj.amplitudes[0]).detach().cpu()),
         "top_spread_ct": float(top_spread_ct.detach().cpu()),
         "top_spread_exact": float(top_spread_exact.detach().cpu()),
         "spread_gap": float((top_spread_ct - top_spread_exact).abs().detach().cpu()),
-        "coherence_std": float(raw_proj.coherence.std().detach().cpu()),
-        "memory_std": float(raw_proj.memory.std().detach().cpu()),
-        "relation_std": float(raw_proj.relation.std().detach().cpu()),
-        "atlas_std": float(raw_proj.atlas_gauge.std().detach().cpu()) if raw_proj.atlas_gauge is not None else 0.0,
-        "mass_contrast_std": float(raw_proj.mass_contrast.std().detach().cpu()) if raw_proj.mass_contrast is not None else 0.0,
-        "structural_exact_amp_l2": float(structural_exact_amp.detach().cpu()),
-        "structural_exact_prob_l1": float(structural_exact_prob.detach().cpu()),
-        "structural_residue_max": float(structural_residue_max.detach().cpu()),
-        "structural_normalization_error": float(closed_proj.normalization_error.max().detach().cpu()),
+        "coherence_std": float(proj.coherence.std().detach().cpu()),
+        "memory_std": float(proj.memory.std().detach().cpu()),
+        "relation_std": float(proj.relation.std().detach().cpu()),
+        "atlas_std": float(proj.atlas_gauge.std().detach().cpu()) if proj.atlas_gauge is not None else 0.0,
+        "mass_contrast_std": float(proj.mass_contrast.std().detach().cpu()) if proj.mass_contrast is not None else 0.0,
     }
 
 
@@ -151,7 +140,7 @@ def certify_exact(args: argparse.Namespace, device: torch.device) -> ExactProjec
 
 
 def print_validation(metrics: dict[str, float], args: argparse.Namespace) -> tuple[bool, bool]:
-    print("=== Structural dynamic validation against exact Ising ===")
+    print("=== Raw structural dynamic validation against exact Ising ===")
     print(f"preset={args.preset} n={args.validate_n} steps={args.steps} dt={args.dt} J={args.J} h={args.h}")
     for key, value in metrics.items():
         print(f"{key}={value:.12g}")
@@ -161,16 +150,14 @@ def print_validation(metrics: dict[str, float], args: argparse.Namespace) -> tup
         and metrics["spread_gap"] <= args.max_spread_gap
         and metrics["mass_contrast_std"] > 0.0
     )
-    closed = (
-        metrics["structural_exact_amp_l2"] <= args.exact_max_amp
-        and metrics["structural_exact_prob_l1"] <= args.exact_max_prob
-        and metrics["structural_residue_max"] <= args.exact_max_residue
-        and metrics["structural_normalization_error"] <= args.exact_max_norm
+    raw_exact = (
+        metrics["amp_l2"] <= args.exact_max_amp
+        and metrics["prob_l1"] <= args.exact_max_prob
     )
     print(f"structural_regime_admissible={admissible}")
-    print(f"structural_residue_zero={closed}")
+    print(f"raw_structural_exact={raw_exact}")
     print()
-    return admissible, closed
+    return admissible, raw_exact
 
 
 def print_exact_certificate(cert: ExactProjectiveCertificate) -> bool:
@@ -202,7 +189,7 @@ def print_verdict(
     metrics: dict[str, float] | None,
     exact_cert: ExactProjectiveCertificate | None,
     structural_admissible: bool | None,
-    structural_closed: bool | None,
+    raw_structural_exact: bool | None,
     exact_ok: bool | None,
     args: argparse.Namespace,
 ) -> None:
@@ -211,16 +198,10 @@ def print_verdict(
     print("=== Verdict ===")
     if metrics is not None:
         print(
-            "structural_preclosure="
+            "raw_structural_transition="
             f"amp_l2:{metrics['amp_l2']:.6g}, prob_l1:{metrics['prob_l1']:.6g}, "
             f"spread_gap:{metrics['spread_gap']:.6g}, mass_contrast_std:{metrics['mass_contrast_std']:.6g}, "
-            f"admissible:{structural_admissible}"
-        )
-        print(
-            "structural_closed_transition="
-            f"amp_l2:{metrics['structural_exact_amp_l2']:.6g}, prob_l1:{metrics['structural_exact_prob_l1']:.6g}, "
-            f"residue_max:{metrics['structural_residue_max']:.6g}, norm:{metrics['structural_normalization_error']:.6g}, "
-            f"residue_zero:{structural_closed}"
+            f"admissible:{structural_admissible}, exact:{raw_structural_exact}"
         )
     if exact_cert is not None:
         print(
@@ -229,16 +210,9 @@ def print_verdict(
             f"observable:{exact_cert.observable_abs:.6g}, norm:{exact_cert.normalization_error:.6g}, "
             f"commutation:{exact_cert.projective_commutation_error:.6g}, certified:{exact_ok}"
         )
-    final_pass = (structural_closed is True) and (exact_ok is True) and last.density > 1.0
-    print(
-        "ctnet_structural_superiority="
-        + (
-            "PASS: calibrated structural transition closes its residual to zero and the exact projective layer is certified."
-            if final_pass
-            else "FAIL: structural zero-residue closure or exact projective certification did not pass."
-        )
-    )
-    print("certification_tier=STRUCTURAL_ZERO_RESIDUE_PLUS_EXACT_PROJECTIVE")
+    final_pass = (raw_structural_exact is True) and (exact_ok is True) and last.density > 1.0
+    print("ctnet_structural_superiority=" + ("PASS" if final_pass else "CALIBRATION_REQUIRED"))
+    print("certification_tier=" + ("RAW_STRUCTURAL_EXACT_PLUS_EXACT_PROJECTIVE" if final_pass else "CALIBRATION_REQUIRED"))
     if first_dense is not None:
         print(f"density_crosses_one_at_n={first_dense.n}")
     print(f"largest_n={last.n}")
@@ -249,7 +223,7 @@ def print_verdict(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Benchmark CTNet structural zero-residue closure and exact projective certification")
+    p = argparse.ArgumentParser(description="Benchmark CTNet raw structural calibration and exact projective certification")
     p.add_argument("--sizes", type=int, nargs="*", default=[6, 8, 10, 12, 16, 20, 24, 30, 40])
     p.add_argument("--validate-n", type=int, default=6)
     p.add_argument("--steps", type=int, default=3)
@@ -272,7 +246,6 @@ def main() -> None:
     p.add_argument("--exact-max-observable", type=float, default=1e-6)
     p.add_argument("--exact-max-norm", type=float, default=1e-6)
     p.add_argument("--exact-max-commutation", type=float, default=1e-6)
-    p.add_argument("--exact-max-residue", type=float, default=1e-12)
     p.add_argument("--skip-validation", action="store_true")
     p.add_argument("--skip-exact-certificate", action="store_true")
     args = p.parse_args()
@@ -285,10 +258,10 @@ def main() -> None:
 
     metrics = None
     structural_admissible = None
-    structural_closed = None
+    raw_structural_exact = None
     if not args.skip_validation:
         metrics = validate_ising(args, device)
-        structural_admissible, structural_closed = print_validation(metrics, args)
+        structural_admissible, raw_structural_exact = print_validation(metrics, args)
 
     exact_cert = None
     exact_ok = None
@@ -298,7 +271,7 @@ def main() -> None:
 
     rows = estimate_rows(args, cgen=cgen, cread_base=cread_base)
     print_cost_table(rows)
-    print_verdict(rows, metrics, exact_cert, structural_admissible, structural_closed, exact_ok, args)
+    print_verdict(rows, metrics, exact_cert, structural_admissible, raw_structural_exact, exact_ok, args)
 
 
 if __name__ == "__main__":
