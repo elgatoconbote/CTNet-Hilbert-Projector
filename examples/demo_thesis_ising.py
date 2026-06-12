@@ -36,7 +36,7 @@ def main() -> None:
     p.add_argument("--J", type=float, default=1.0)
     p.add_argument("--h", type=float, default=0.5)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--preset", default="", help="calibrated preset, e.g. ising_v1")
+    p.add_argument("--preset", default="", help="calibrated preset, e.g. ising_v1 or ising_v2")
     p.add_argument("--state-strength", type=float, default=0.05)
     p.add_argument("--cocycle", type=float, default=0.25)
     p.add_argument("--prep-memory", type=float, default=0.20)
@@ -44,6 +44,8 @@ def main() -> None:
     p.add_argument("--atlas", type=float, default=0.20)
     p.add_argument("--mass-feedback", type=float, default=0.05)
     p.add_argument("--phase-strength", type=float, default=1.0)
+    p.add_argument("--hamiltonian-mass", type=float, default=0.0)
+    p.add_argument("--cardinal-mass", type=float, default=0.0)
     p.add_argument("--beta", type=float, default=1.0)
     p.add_argument("--gamma", type=float, default=1.0)
     p.add_argument("--cuda", action="store_true")
@@ -69,6 +71,8 @@ def main() -> None:
             gamma_residue=args.gamma,
             hamiltonian_state_strength=args.state_strength,
             hamiltonian_phase_strength=args.phase_strength,
+            hamiltonian_mass_strength=args.hamiltonian_mass,
+            cardinal_mass_strength=args.cardinal_mass,
             mass_feedback_strength=args.mass_feedback,
             atlas_strength=args.atlas,
             cocycle_strength=args.cocycle,
@@ -102,6 +106,7 @@ def main() -> None:
     print(f"prep_memory={prep_memory} prep_relation={prep_relation}")
     print(f"beta={cfg.beta_coherence} gamma={cfg.gamma_residue} atlas={cfg.atlas_strength}")
     print(f"phase_strength={cfg.hamiltonian_phase_strength} state_strength={cfg.hamiltonian_state_strength} mass_feedback={cfg.mass_feedback_strength}")
+    print(f"hamiltonian_mass={cfg.hamiltonian_mass_strength} cardinal_mass={cfg.cardinal_mass_strength}")
     print(f"normalization_error={float(proj.normalization_error.max().detach().cpu()):.12g}")
     print(f"amp_l2_error={float(amplitude_l2_error(exact, psi).detach().cpu()):.12g}")
     print(f"prob_l1_error={float(probability_l1_error(exact, psi).detach().cpu()):.12g}")
@@ -117,6 +122,8 @@ def main() -> None:
     print(f"cocycle_nonseparability={float(cocycle_nonseparability_score(proj).max().detach().cpu()):.12g}")
     if proj.atlas_gauge is not None:
         print(f"atlas_std={float(proj.atlas_gauge.std().detach().cpu()):.12g}")
+    if proj.mass_contrast is not None:
+        print(f"mass_contrast_std={float(proj.mass_contrast.std().detach().cpu()):.12g}")
 
     top = torch.topk(proj.probabilities[0].detach(), k=min(10, proj.probabilities.shape[-1]))
     print("\nTop projected probabilities:")
