@@ -16,7 +16,7 @@ Faithful executable version of the CTNet/u-p quantum thesis:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -38,7 +38,7 @@ class ThesisDynamicsConfig:
     mass_feedback_strength: float = 0.05
     coherence_feedback_strength: float = 0.02
     coherence_rank: int = 2
-    feature_dim: int = 8
+    feature_dim: int = 12
     coherence_clamp: float = 8.0
     eps: float = 1e-9
 
@@ -47,9 +47,9 @@ class ThesisDynamicsConfig:
 class CoherenceTensorState:
     """Explicit K_t = D_t + U_t V_t^T representation."""
 
-    diagonal: torch.Tensor  # [B,F]
-    low_rank_u: torch.Tensor  # [B,F,R]
-    low_rank_v: torch.Tensor  # [B,F,R]
+    diagonal: torch.Tensor
+    low_rank_u: torch.Tensor
+    low_rank_v: torch.Tensor
 
 
 @dataclass
@@ -149,6 +149,21 @@ def _pair_drive(weights: torch.Tensor, bmat: torch.Tensor) -> torch.Tensor:
     return out
 
 
+def _branch_cardinal_signatures(bmat: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Return intrinsic u/p branch features without collapsing u/p to binary semantics."""
+    activity = bmat.mean(dim=-1)
+    if bmat.shape[-1] > 1:
+        adjacent = bmat[:, :-1] * bmat[:, 1:]
+        pair_signature = adjacent.mean(dim=-1)
+        transition_density = ((1.0 - adjacent) * 0.5).mean(dim=-1)
+        boundary_signature = bmat[:, 0] * bmat[:, -1]
+    else:
+        pair_signature = bmat[:, 0]
+        transition_density = torch.zeros_like(pair_signature)
+        boundary_signature = bmat[:, 0]
+    return activity, pair_signature, transition_density, boundary_signature
+
+
 def condition_state_with_hamiltonian(
     state: FoldedOmegaCuboState,
     H: torch.Tensor,
@@ -188,7 +203,8 @@ def condition_state_with_hamiltonian(
         diag_n.mean(), diag_n.std(), coup_n.mean(), coup_n.std(), phase_n.mean(), phase_n.std(),
         pair_diag.abs().mean(), pair_phase.abs().mean(), global_scale,
     ])
-    c_delta[:, : min(c_delta.shape[-1], c_stats.numel())] = c_stats[: c_delta.shape[-1]]
+    width = min(c_delta.shape[-1], c_stats.numel())
+    c_delta[:, :width] = c_stats[:width]
 
     alpha = float(strength)
     return FoldedOmegaCuboState(
@@ -230,7 +246,7 @@ def branch_feature_tensor(
     H: torch.Tensor | None,
     config: ThesisDynamicsConfig,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Build phi_t(sigma; Z,M,R,C6,rho,Omega,H)."""
+    """Build phi_t(sigma; Z,M,R,C6,rho,Omega,H) with explicit cardinal signatures."""
     z_proj, m_proj, r_proj, bmat = _branch_projections(state, branches)
     obs = omega_core.cubo_observation(state)
     omega_global = obs["omega"].unsqueeze(-1).to(dtype=state.z.dtype)
@@ -246,10 +262,29 @@ def branch_feature_tensor(
         coupling = torch.zeros_like(z_proj)
         phase_drive = torch.zeros_like(z_proj)
 
+    activity, pair_signature, transition_density, boundary_signature = _branch_cardinal_signatures(bmat)
+    activity = activity.unsqueeze(0).expand_as(z_proj)
+    pair_signature = pair_signature.unsqueeze(0).expand_as(z_proj)
+    transition_density = transition_density.unsqueeze(0).expand_as(z_proj)
+    boundary_signature = boundary_signature.unsqueeze(0).expand_as(z_proj)
+
     cocycle = relational_cocycle(state, branches, config.cocycle_strength)
     omega = omega_global.expand_as(z_proj)
     clos = closure.expand_as(z_proj)
-    phi = torch.stack([z_proj, m_proj, r_proj, diag, coupling, phase_drive, clos, omega], dim=-1)
+    phi = torch.stack([
+        z_proj,
+        m_proj,
+        r_proj,
+        diag,
+        coupling,
+        phase_drive,
+        clos,
+        omega,
+        activity,
+        pair_signature,
+        transition_density,
+        boundary_signature,
+    ], dim=-1)
     if phi.shape[-1] != config.feature_dim:
         phi = _match_dim(phi, config.feature_dim)
     return phi, z_proj, m_proj, r_proj, phase_drive, cocycle
@@ -260,7 +295,11 @@ def build_coherence_tensor(
     H: torch.Tensor | None,
     config: ThesisDynamicsConfig,
 ) -> CoherenceTensorState:
-    """Construct explicit K_t = D_t + U_t V_t^T from C6 and H statistics."""
+    """Construct bounded K_t = D_t + U_t V_t^T from C6 and H statistics.
+
+    K is intentionally bounded at initialization; otherwise c_t saturates and the
+    mass economy loses regional contrast.
+    """
     B = state.cubo.shape[0]
     Fdim = config.feature_dim
     rank = max(1, int(config.coherence_rank))
@@ -268,29 +307,31 @@ def build_coherence_tensor(
     cubo = _match_dim(state.cubo, Fdim * (1 + 2 * rank))
     diagonal_raw = cubo[:, :Fdim]
     low_raw = cubo[:, Fdim:]
-    diagonal = 0.25 + F.softplus(diagonal_raw)
+    diagonal = 0.02 + 0.18 * torch.sigmoid(diagonal_raw)
     if low_raw.shape[-1] < 2 * Fdim * rank:
         low_raw = F.pad(low_raw, (0, 2 * Fdim * rank - low_raw.shape[-1]))
     low_raw = low_raw[:, : 2 * Fdim * rank]
     u_raw, v_raw = low_raw.split(Fdim * rank, dim=-1)
-    U = torch.tanh(u_raw.reshape(B, Fdim, rank))
-    V = torch.tanh(v_raw.reshape(B, Fdim, rank))
+    U = 0.05 * torch.tanh(u_raw.reshape(B, Fdim, rank))
+    V = 0.05 * torch.tanh(v_raw.reshape(B, Fdim, rank))
 
     if H is not None:
         h_scale = H.real.abs().mean().to(device=device, dtype=dtype).view(1, 1)
-        diagonal = diagonal + 0.05 * h_scale
-        U = U + 0.01 * h_scale.view(1, 1, 1)
-        V = V - 0.01 * h_scale.view(1, 1, 1)
+        diagonal = diagonal + 0.005 * torch.tanh(h_scale)
+        U = U + 0.002 * torch.tanh(h_scale).view(1, 1, 1)
+        V = V - 0.002 * torch.tanh(h_scale).view(1, 1, 1)
     return CoherenceTensorState(diagonal=diagonal, low_rank_u=U, low_rank_v=V)
 
 
 def coherence_from_tensor(phi: torch.Tensor, K: CoherenceTensorState) -> torch.Tensor:
-    """c_t(sigma)=<phi,D phi> + sum_r <phi,U_r><phi,V_r>."""
-    diag_part = (phi.pow(2) * K.diagonal.unsqueeze(1)).sum(dim=-1)
-    u_proj = torch.einsum("bsf,bfr->bsr", phi, K.low_rank_u)
-    v_proj = torch.einsum("bsf,bfr->bsr", phi, K.low_rank_v)
+    """c_t(sigma)=<phi,D phi> + sum_r <phi,U_r><phi,V_r>, scale-controlled."""
+    phi_scale = phi.pow(2).mean(dim=-1, keepdim=True).sqrt().clamp_min(1e-6)
+    phi_n = phi / phi_scale
+    diag_part = (phi_n.pow(2) * K.diagonal.unsqueeze(1)).sum(dim=-1)
+    u_proj = torch.einsum("bsf,bfr->bsr", phi_n, K.low_rank_u)
+    v_proj = torch.einsum("bsf,bfr->bsr", phi_n, K.low_rank_v)
     low_part = (u_proj * v_proj).sum(dim=-1)
-    return diag_part + low_part
+    return (diag_part + low_part) / (float(phi.shape[-1]) ** 0.5)
 
 
 def thesis_project(
@@ -376,7 +417,8 @@ def feedback_state_with_mass(
         projection.phases.mean(dim=-1), projection.phases.std(dim=-1), projection.coherence.mean(dim=-1),
         projection.residue.mean(dim=-1), projection.cocycle.abs().mean(dim=-1), phase_cos.mean(dim=-1),
     ], dim=-1).to(dtype=state.cubo.dtype)
-    c_delta[:, : min(c_delta.shape[-1], stats.shape[-1])] = stats[:, : c_delta.shape[-1]]
+    width = min(c_delta.shape[-1], stats.shape[-1])
+    c_delta[:, :width] = stats[:, :width]
 
     alpha = float(config.mass_feedback_strength)
     return FoldedOmegaCuboState(
