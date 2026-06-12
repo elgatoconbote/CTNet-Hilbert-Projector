@@ -71,7 +71,7 @@ def ising_v2(n_qubits: int) -> ThesisIsingPreset:
 
 
 def ising_v3(n_qubits: int) -> ThesisIsingPreset:
-    """Best calibrated mass-contrast Ising regime so far.
+    """Best calibrated mass-contrast Ising grid-search regime.
 
     Calibration target: n=6, J=1.0, h=0.5, dt=0.05, steps=3.
     Observed best in grid: amp_l2 ~= 0.5658, prob_l1 ~= 0.5301,
@@ -96,12 +96,40 @@ def ising_v3(n_qubits: int) -> ThesisIsingPreset:
     )
 
 
+def ising_v4(n_qubits: int) -> ThesisIsingPreset:
+    """Optimized local-search Ising regime.
+
+    Calibration target: n=6, J=1.0, h=0.5, dt=0.05, steps=3.
+    Observed best local search: amp_l2 ~= 0.4382, prob_l1 ~= 0.4564,
+    top_spread ~= 0.0590 against exact top_spread ~= 0.0618.
+    """
+    return ThesisIsingPreset(
+        name="ising_v4",
+        prep_memory=0.8756458888418646,
+        prep_relation=0.24287761678755834,
+        config=ThesisDynamicsConfig(
+            n_qubits=n_qubits,
+            beta_coherence=2.0268331595996703,
+            gamma_residue=1.0862603882186894,
+            hamiltonian_state_strength=0.108937504106222,
+            hamiltonian_phase_strength=2.9187665969196077,
+            hamiltonian_mass_strength=1.0654026691631004,
+            cardinal_mass_strength=2.8445028403778054,
+            mass_feedback_strength=0.043803821502135146,
+            atlas_strength=0.6737745235209466,
+            cocycle_strength=0.25,
+        ),
+    )
+
+
 def get_thesis_preset(name: str, n_qubits: int) -> ThesisIsingPreset:
     key = name.strip().lower().replace("-", "_")
     if key in {"ising_v1"}:
         return ising_v1(n_qubits)
     if key in {"ising_v2", "ising_mass"}:
         return ising_v2(n_qubits)
-    if key in {"ising_v3", "ising", "best"}:
+    if key in {"ising_v3"}:
         return ising_v3(n_qubits)
+    if key in {"ising_v4", "ising", "best"}:
+        return ising_v4(n_qubits)
     raise ValueError(f"unknown thesis preset: {name!r}")
