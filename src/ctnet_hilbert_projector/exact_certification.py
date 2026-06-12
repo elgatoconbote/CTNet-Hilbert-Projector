@@ -11,11 +11,9 @@ from .hamiltonians import amplitude_l2_error, evolve_exact, expectation, probabi
 class ExactProjectiveCertificate:
     """Numerical certificate for the exact projective layer.
 
-    This certificate checks the formal CTNet layer used in the theorem:
-    a quantum evolution U is first represented as projected amplitudes and then
-    lifted exactly into mass-phase branch data. It is intentionally distinct
-    from the calibrated structural dynamics, whose role is to approximate a
-    concrete CTNet transition regime.
+    This certificate checks the formal CTNet layer used in the theorem: a quantum
+    evolution U is represented as projected amplitudes and lifted exactly into
+    mass-phase branch data.
     """
 
     amp_l2: float
@@ -41,20 +39,7 @@ class ExactProjectiveCertificate:
 
 
 def mass_phase_lift(amplitudes: torch.Tensor, eps: float = 1e-15) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Lift amplitudes into CTNet mass-phase form and reconstruct them.
-
-    For a branch family A(sigma), CTNet mass-phase data are
-
-        mu(sigma) = |A(sigma)|^2
-        P(sigma) = mu(sigma) / sum_tau mu(tau)
-        theta(sigma) = arg A(sigma)
-        A_rec(sigma) = sqrt(P(sigma)) exp(i theta(sigma))
-
-    The reconstruction is exact up to floating-point precision when amplitudes
-    are normalized. The exact certificate promotes inputs to complex128 before
-    calling this routine.
-    """
-
+    """Lift amplitudes into CTNet mass-phase form and reconstruct them."""
     if amplitudes.ndim != 1:
         raise ValueError("amplitudes must have shape [branches]")
     mass = amplitudes.abs().pow(2)
@@ -76,25 +61,7 @@ def certify_exact_projective_evolution(
     max_norm: float = 1e-6,
     max_commutation: float = 1e-6,
 ) -> ExactProjectiveCertificate:
-    """Certify exact CTNet projective representation of a quantum evolution.
-
-    The check has two parts:
-
-    1. Projective commutation in finite basis:
-       exp(-i H t) applied to the projected initial amplitudes gives the exact
-       target branch family.
-    2. Mass-phase exactness:
-       the target branch family is lifted to CTNet mass and phase and then
-       reconstructed amplitude by amplitude.
-
-    This certifies the exact layer required by the theorem. It does not claim
-    that a calibrated structural transition has already reached zero residual.
-
-    Inputs are promoted to complex128 internally so that a 1e-6 certificate is
-    not dominated by complex64 roundoff in matrix exponentials or probability
-    reconstruction.
-    """
-
+    """Certify exact CTNet projective representation of a quantum evolution."""
     if initial_amplitudes.ndim != 1:
         raise ValueError("initial_amplitudes must have shape [branches]")
 
