@@ -28,27 +28,39 @@ procesador cuántico  -> caso físico-muestral de un régimen proyectivo más am
 CTNet                -> estado generador con acceso estructural interno
 ```
 
-## Qué hace este repositorio
+## Formulación computacional
 
-Este repositorio prueba una idea: representar un estado cuántico con una estructura CTNet persistente, en vez de tratarlo como una lista gigante de amplitudes.
-
-La estructura principal es:
+El repositorio representa estados cuánticos mediante una carta CTNet persistente, no mediante una lista extensional de amplitudes. El objeto central es:
 
 ```text
 Xi = pack(Z, M, R, C6, pad)
 ```
 
-Desde ese estado se leen amplitudes por rama:
+con la siguiente descomposición:
 
 ```text
-A(sigma) = Q_sigma(Xi)
+Z   : campo cardinal u/p donde se inscribe la rama o configuración.
+M   : memoria topológica asociada al estado generador.
+R   : banco relacional para no separabilidad, acoplos y estructura entre ramas.
+C6  : coordenadas de cierre Omega + Cubo 6D.
+pad : reserva estructural fija para conservar grados internos del estado plegado.
 ```
 
-La rama `sigma` representa una configuración en base `u/p`. La lectura `Q_sigma` devuelve la amplitud compleja asociada a esa rama.
+La amplitud no se toma como una celda almacenada en una tabla. Se obtiene mediante una lectura proyectiva:
 
-La diferencia con una simulación cuántica normal es que aquí no se empieza enumerando todo el espacio de Hilbert. Se construye un estado generador y se leen ramas cuando hace falta.
+```text
+A_t(sigma) = Q_sigma(Xi_t)
+```
 
-El Cubo 6D entra como mecanismo de cierre: organiza la carta, cierra la condición `u=p` y permite obtener una familia de amplitudes normalizada desde `Xi`.
+Aquí `sigma` es una rama cardinal en base `{u,p}^n`. La función `Q_sigma` lee sobre `Xi_t` la masa modal y la fase asociadas a esa rama, y devuelve una amplitud compleja normalizada. El vector de estado aparece como la familia completa de lecturas:
+
+```text
+psi_t = { Q_sigma(Xi_t) : sigma in {u,p}^n }
+```
+
+La diferencia con una simulación cuántica convencional es que el vector de Hilbert no se materializa como objeto primario. Primero se mantiene un estado generador `Xi_t`; después se consultan ramas, cartas o sectores mediante lecturas `Q_sigma`.
+
+El Cubo 6D interviene como mecanismo de cierre de la carta. Observa la estructura `(Z,M,R)`, produce coordenadas `C6`, mide residuo, absorción, omega y cierre, y permite reinscribir la carta hacia la condición `u=p`. En la aplicación Ising incluida en `examples/solve_ising_cubo6d_exact_fixed_point.py`, el resultado se lee como `Q_sigma(Xi_solution)` después de cerrar la carta, sin usar evolución densa exacta como solución.
 
 ## Por qué CTNet supera al procesador cuántico físico
 
