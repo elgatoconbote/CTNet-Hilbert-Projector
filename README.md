@@ -256,6 +256,9 @@ examples/demo_small_projector.py
 examples/demo_thesis_ising.py
   Demo de dinámica CTNet-cuántica frente a Ising transversal.
 
+examples/solve_ising_cubo6d_exact_fixed_point.py
+  Solver Cubo 6D exacto sobre carta Ising: Observador, masa contextual, Cubo6DObserver, cierre u=p y lectura Q_sigma(Xi_solution).
+
 examples/benchmark_projective_superiority.py
   Benchmark de densidad proyectiva, coste de listado, coste tomográfico y certificación.
 ```
@@ -271,6 +274,49 @@ pip install -e .
 ```bash
 python examples/demo_small_projector.py --n 3 --steps 1
 ```
+
+## Solver Cubo 6D exacto sobre carta Ising
+
+El ejemplo operativo que aplica el Cubo 6D como cierre exacto de la carta CTNet-Ising es:
+
+```bash
+python examples/solve_ising_cubo6d_exact_fixed_point.py \
+  --n 6 \
+  --J 1.0 \
+  --h 0.5 \
+  --dt 0.05 \
+  --steps 3 \
+  --cuda
+```
+
+La ruta ejecutada es:
+
+```text
+Observador
+-> batch_to_state
+-> Cubo6DObserver
+-> contextual_drive
+-> exact_fixed_point_u=p
+-> Q_sigma(Xi_solution)
+```
+
+Este ejemplo no usa evolución densa exacta como solución, no usa optimizador y no itera `forward_state` como aproximación. El cierre se comprueba directamente sobre la carta persistente:
+
+```text
+uses_exact_dense_evolution_inside_solver=False
+uses_forward_state_loop=False
+uses_optimizer=False
+u_p_total=0
+up_z=0
+up_memory=0
+up_relations=0
+up_cubo=0
+up_xi=0
+up_delta=0
+normalization_error=0
+```
+
+La salida `Q_sigma(Xi_solution)` es una familia de amplitudes complejas normalizadas sobre las ramas cardinales `sigma in {u,p}^n`.
 
 ## Benchmark de superioridad proyectiva
 
