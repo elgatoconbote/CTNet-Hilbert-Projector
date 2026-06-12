@@ -28,7 +28,7 @@ def test_projection_normalizes_small_state() -> None:
     assert projection.amplitudes.shape == (2, 8)
     assert projection.probabilities.shape == (2, 8)
     assert torch.allclose(projection.probabilities.sum(dim=-1), torch.ones(2), atol=1e-6)
-    assert float(projection.normalization_error.max()) < 1e-6
+    assert float(projection.normalization_error.max().detach()) < 1e-6
 
 
 def test_ctnet_forward_inverse_audit_runs() -> None:
