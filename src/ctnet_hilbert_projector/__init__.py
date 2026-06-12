@@ -11,6 +11,11 @@ from .ctnet_omega_core import (
     FoldedOmegaCuboState,
     FoldedCTNetOmegaCubo26,
 )
+from .exact_certification import (
+    ExactProjectiveCertificate,
+    certify_exact_projective_evolution,
+    mass_phase_lift,
+)
 from .hamiltonians import (
     IsingConfig,
     amplitude_l2_error,
@@ -36,6 +41,9 @@ __all__ = [
     "FoldLayout",
     "FoldedOmegaCuboState",
     "FoldedCTNetOmegaCubo26",
+    "ExactProjectiveCertificate",
+    "certify_exact_projective_evolution",
+    "mass_phase_lift",
     "IsingConfig",
     "amplitude_l2_error",
     "basis_state",
