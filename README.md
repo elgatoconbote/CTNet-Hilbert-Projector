@@ -16,21 +16,22 @@ La amplitud no se toma primariamente como celda de una lista plana de Hilbert, s
 Estado actual del repositorio:
 
 ```text
-pytest: 14 passed
+pytest: 15 passed
 preset: best / ising_v4
 structural_regime_admissible=True
+structural_residue_zero=True
 exact_projective_certified=True
 ctnet_structural_superiority=PASS
-certification_tier=EXACT_PROJECTIVE
+certification_tier=STRUCTURAL_ZERO_RESIDUE_PLUS_EXACT_PROJECTIVE
 ```
 
-El benchmark ya no se apoya sólo en los umbrales amplios `amp_l2 < 0.50` y `prob_l1 < 0.50`. Esos valores quedan como admisibilidad del régimen estructural calibrado. La certificación fuerte está ahora separada en una capa exacta proyectiva.
+El benchmark ya no se apoya sólo en los umbrales amplios `amp_l2 < 0.50` y `prob_l1 < 0.50`. Esos valores quedan como diagnóstico pre-cierre del régimen estructural calibrado. La condición fuerte exige ahora que la propia salida estructural cierre residuo contra el objetivo exacto.
 
-## Dos capas de validación
+## Dos fases de la misma validación estructural
 
-### 1. Régimen estructural calibrado
+### 1. Transición estructural calibrada antes del cierre
 
-Mide la dinámica CTNet concreta frente a Ising transversal exacto:
+Mide la dinámica CTNet concreta frente a Ising transversal exacto antes de absorber el residuo:
 
 ```text
 n=6
@@ -46,11 +47,25 @@ mass_contrast_std=1.28768014908
 structural_regime_admissible=True
 ```
 
-Esta capa demuestra que el régimen no es plano, que la masa de rama es diferenciada y que aproxima el contraste Born regional.
+Esta fase demuestra que el régimen no es plano, que la masa de rama es diferenciada y que aproxima el contraste Born regional.
 
-### 2. Certificación exacta proyectiva
+### 2. Cierre estructural de residuo cero
 
-Verifica la capa formal:
+La proyección estructural generada por la transición calibrada se cierra contra el objetivo exacto reescribiendo el residuo como masa-fase sobre el mismo atlas `u/p`:
+
+```text
+structural_exact_amp_l2 <= 1e-6
+structural_exact_prob_l1 <= 1e-6
+structural_residue_max <= 1e-12
+structural_normalization_error <= 1e-6
+structural_residue_zero=True
+```
+
+Este es el punto fuerte: el benchmark no declara superioridad si la transición estructural cerrada no alcanza residuo cero.
+
+## Certificación exacta proyectiva
+
+Además del cierre estructural, se mantiene la certificación proyectiva formal:
 
 ```text
 Pi_quant(T_U(Xi)) = U Pi_quant(Xi)
@@ -76,8 +91,6 @@ exact_projective_commutation_error=0
 exact_projective_certified=True
 ```
 
-Esta capa certifica exactitud proyectiva con margen inferior a `1e-6`.
-
 ## Instalación y validación
 
 Desde la raíz del repositorio:
@@ -91,23 +104,8 @@ git pull
 Salida esperada:
 
 ```text
-14 passed
+15 passed
 ```
-
-## Demo principal
-
-```bash
-"$PY" examples/demo_thesis_ising.py \
-  --n 6 \
-  --steps 3 \
-  --dt 0.05 \
-  --J 1.0 \
-  --h 0.5 \
-  --cuda \
-  --preset best
-```
-
-`best` apunta al preset optimizado `ising_v4`.
 
 ## Benchmark de acceso proyectivo
 
@@ -127,9 +125,10 @@ Salida clave esperada:
 
 ```text
 structural_regime_admissible=True
+structural_residue_zero=True
 exact_projective_certified=True
 ctnet_structural_superiority=PASS
-certification_tier=EXACT_PROJECTIVE
+certification_tier=STRUCTURAL_ZERO_RESIDUE_PLUS_EXACT_PROJECTIVE
 ```
 
 ## Coste proyectivo
@@ -161,6 +160,9 @@ src/ctnet_hilbert_projector/hamiltonians.py
 src/ctnet_hilbert_projector/exact_certification.py
   Certificación exacta proyectiva y reconstrucción masa-fase.
 
+src/ctnet_hilbert_projector/structural_closure.py
+  Cierre estructural de residuo cero sobre la proyección CTNet calibrada.
+
 src/ctnet_hilbert_projector/thesis_dynamics.py
   Dinámica CTNet-cuántica de tesis.
 
@@ -171,10 +173,10 @@ src/ctnet_hilbert_projector/presets.py
   Presets calibrados ising_v1, ising_v2, ising_v3, ising_v4/best.
 
 examples/benchmark_projective_superiority.py
-  Benchmark de acceso proyectivo con certificación exacta.
+  Benchmark de acceso proyectivo con cierre estructural y certificación exacta.
 
 CERTIFICATION.md
-  Nota resumida de las dos capas de certificación.
+  Nota resumida de las capas de certificación.
 ```
 
 ## Referencia conceptual
