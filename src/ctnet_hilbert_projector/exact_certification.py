@@ -40,7 +40,7 @@ class ExactProjectiveCertificate:
         )
 
 
-def mass_phase_lift(amplitudes: torch.Tensor, eps: float = 1e-12) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def mass_phase_lift(amplitudes: torch.Tensor, eps: float = 1e-15) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Lift amplitudes into CTNet mass-phase form and reconstruct them.
 
     For a branch family A(sigma), CTNet mass-phase data are
@@ -51,7 +51,8 @@ def mass_phase_lift(amplitudes: torch.Tensor, eps: float = 1e-12) -> tuple[torch
         A_rec(sigma) = sqrt(P(sigma)) exp(i theta(sigma))
 
     The reconstruction is exact up to floating-point precision when amplitudes
-    are normalized.
+    are normalized. The exact certificate promotes inputs to complex128 before
+    calling this routine.
     """
 
     if amplitudes.ndim != 1:
@@ -88,19 +89,26 @@ def certify_exact_projective_evolution(
 
     This certifies the exact layer required by the theorem. It does not claim
     that a calibrated structural transition has already reached zero residual.
+
+    Inputs are promoted to complex128 internally so that a 1e-6 certificate is
+    not dominated by complex64 roundoff in matrix exponentials or probability
+    reconstruction.
     """
 
     if initial_amplitudes.ndim != 1:
         raise ValueError("initial_amplitudes must have shape [branches]")
 
+    initial = initial_amplitudes.to(dtype=torch.complex128)
+    H = hamiltonian.to(device=initial.device, dtype=torch.complex128)
+
     total_dt = float(dt) * int(steps)
-    U = torch.matrix_exp((-1j * total_dt) * hamiltonian)
-    target = evolve_exact(initial_amplitudes, hamiltonian, dt=dt, steps=steps)
-    commuting_target = U @ initial_amplitudes
+    U = torch.matrix_exp((-1j * total_dt) * H)
+    target = evolve_exact(initial, H, dt=dt, steps=steps)
+    commuting_target = U @ initial
     reconstructed, _, _ = mass_phase_lift(target)
 
-    obs_target = expectation(target, hamiltonian)
-    obs_reconstructed = expectation(reconstructed, hamiltonian)
+    obs_target = expectation(target, H)
+    obs_reconstructed = expectation(reconstructed, H)
 
     return ExactProjectiveCertificate(
         amp_l2=float(amplitude_l2_error(target, reconstructed, phase_invariant=False).detach().cpu()),
