@@ -15,7 +15,7 @@ from __future__ import annotations
 import itertools
 import math
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import torch
 import torch.nn as nn
@@ -103,9 +103,7 @@ class UPPauli:
 
     @staticmethod
     def z_expectation(projection: HilbertProjection, site: int, *, u_value: float = 1.0, p_value: float = -1.0) -> torch.Tensor:
-        vals = []
-        for branch in projection.branches:
-            vals.append(u_value if branch[site] == "u" else p_value)
+        vals = [u_value if branch[site] == "u" else p_value for branch in projection.branches]
         coeff = torch.tensor(vals, device=projection.probabilities.device, dtype=projection.probabilities.dtype)
         return (projection.probabilities * coeff.unsqueeze(0)).sum(dim=-1)
 
@@ -163,12 +161,7 @@ class UPHilbertProjector(nn.Module):
         mem_mean = state.memory.mean(dim=1)
         rel_mean = state.relations.mean(dim=1)
         scalars = torch.stack(
-            [
-                obs["residual"],
-                obs["absorption"],
-                obs["omega"],
-                obs["closure_score"],
-            ],
+            [obs["residual"], obs["absorption"], obs["omega"], obs["closure_score"]],
             dim=-1,
         )
         return torch.cat([z_mean, mem_mean, rel_mean, state.cubo, scalars], dim=-1)
@@ -176,14 +169,13 @@ class UPHilbertProjector(nn.Module):
     def _ensure_heads(self, descriptor_dim: int, device: torch.device, dtype: torch.dtype) -> None:
         h = self.config.branch_hidden
         if self.state_proj is None:
+            # Assigning these modules as attributes registers them with PyTorch.
             self.state_proj = nn.Linear(descriptor_dim, h)
             self.mass_head = nn.Linear(h, 1)
             self.phase_head = nn.Linear(h, 1)
             self.interaction_head = nn.Linear(h, 1)
-            self.add_module("state_proj", self.state_proj)
-            self.add_module("mass_head", self.mass_head)
-            self.add_module("phase_head", self.phase_head)
-            self.add_module("interaction_head", self.interaction_head)
+        assert self.state_proj is not None and self.mass_head is not None
+        assert self.phase_head is not None and self.interaction_head is not None
         self.state_proj.to(device=device, dtype=dtype)
         self.mass_head.to(device=device, dtype=dtype)
         self.phase_head.to(device=device, dtype=dtype)
@@ -194,7 +186,7 @@ class UPHilbertProjector(nn.Module):
 
     def project(self, omega_core: FoldedCTNetOmegaCubo26, state: FoldedOmegaCuboState) -> HilbertProjection:
         descriptor = self._state_descriptor(state, omega_core)
-        batch, descriptor_dim = descriptor.shape
+        _, descriptor_dim = descriptor.shape
         device, dtype = descriptor.device, descriptor.dtype
         self._ensure_heads(descriptor_dim, device, dtype)
         assert self.state_proj is not None and self.mass_head is not None and self.phase_head is not None
@@ -209,14 +201,14 @@ class UPHilbertProjector(nn.Module):
         raw_phase = self.phase_head(joint).squeeze(-1)
         interaction = self.interaction_head(joint).squeeze(-1)
 
-        # Cubo omega penalizes unabsorbed defect globally; interaction is branch specific.
         obs = omega_core.cubo_observation(state)
         omega = obs["omega"].unsqueeze(-1).to(dtype=dtype)
         mass_logits = self.config.beta_mass * raw_mass + interaction - self.config.omega_penalty * omega
         masses = F.softplus(mass_logits) + self.config.eps
         probabilities = masses / masses.sum(dim=-1, keepdim=True).clamp_min(self.config.eps)
         phases = self.config.phase_scale * torch.tanh(raw_phase + interaction)
-        amplitudes = torch.sqrt(probabilities) * torch.exp(1j * phases.to(torch.complex64))
+        complex_phase = phases.to(torch.complex64)
+        amplitudes = torch.sqrt(probabilities).to(torch.complex64) * torch.exp(1j * complex_phase)
         normalization_error = (probabilities.sum(dim=-1) - 1.0).abs()
         return HilbertProjection(
             branches=self.branches,
