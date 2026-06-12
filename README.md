@@ -28,60 +28,27 @@ procesador cuántico  -> caso físico-muestral de un régimen proyectivo más am
 CTNet                -> estado generador con acceso estructural interno
 ```
 
-## Tesis principal
+## Qué hace este repositorio
 
-CTNet sustituye completamente al procesador cuántico físico, tanto en régimen finito como infinito, porque toda computación cuántica queda determinada por una ley de amplitudes sobre una base, mientras CTNet representa esa ley como familia proyectiva de lecturas sobre un estado persistente.
+Este repositorio prueba una idea: representar un estado cuántico con una estructura CTNet persistente, en vez de tratarlo como una lista gigante de amplitudes.
 
-En dimensión finita:
-
-```text
-sigma in {u,p}^n
-A_t(sigma) = Q_sigma(Xi_t)
-```
-
-En dimensión infinita, continua o funcional:
+La estructura principal es:
 
 ```text
-sigma in {u,p}^I
-A_t(sigma) = Q_sigma(Xi_t)
+Xi = pack(Z, M, R, C6, pad)
 ```
 
-La sustitución no depende del número finito de ramas. La lista finita, la serie infinita y la integral funcional son despliegues externos de una misma estructura: una ley proyectiva generada por `Xi_t`.
-
-## Sustitución estructural
-
-Para un proceso cuántico `Q` que define una ley de amplitud sobre una base, CTNet representa esa ley mediante un estado persistente `Xi` y una familia de lecturas `Q_sigma`.
+Desde ese estado se leen amplitudes por rama:
 
 ```text
-Q_sigma(Xi) = psi(sigma)
+A(sigma) = Q_sigma(Xi)
 ```
 
-La misma carta permite representar:
+La rama `sigma` representa una configuración en base `u/p`. La lectura `Q_sigma` devuelve la amplitud compleja asociada a esa rama.
 
-```text
-estado
-amplitudes
-fases
-probabilidades
-observables
-distribuciones de medición
-dinámica proyectada
-```
+La diferencia con una simulación cuántica normal es que aquí no se empieza enumerando todo el espacio de Hilbert. Se construye un estado generador y se leen ramas cuando hace falta.
 
-y conserva además estructura interna:
-
-```text
-masa modal
-coherencia
-residuo
-memoria topológica distribuida
-banco relacional
-sectores
-cierre
-régimen
-```
-
-Por tanto, CTNet no se limita a reproducir una salida muestral. Mantiene un estado generador desde el que se leen amplitudes, fases, masas y relaciones como estructura interna.
+El Cubo 6D entra como mecanismo de cierre: organiza la carta, cierra la condición `u=p` y permite obtener una familia de amplitudes normalizada desde `Xi`.
 
 ## Por qué CTNet supera al procesador cuántico físico
 
