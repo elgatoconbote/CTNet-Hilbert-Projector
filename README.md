@@ -121,13 +121,31 @@ Criterio de exito esperado:
     epsilon_P=1.11742338049e-07
     normalization_error=2.220446049250313e-16
 
-La reproduccion queda dividida en tres capas auditables:
+La reproduccion queda dividida en cuatro capas auditables:
 
     solver      -> genera /tmp/cubo6d_strong_quantum.pt
     readout     -> consulta Q_sigma(Xi_solution)
     auditoria   -> verifica el certificado desde el .pt
+    observables -> mide Z_i, Z_iZ_j, magnetization_z y masa sectorial
 
 Esto permite validar el hito fuerte sin depender de inspeccion manual del log del solver.
+
+## Observables proyectivos internos
+
+El medidor de observables lee el mismo estado `.pt` y calcula magnitudes diagonales en la base cardinal u/p:
+
+    $PY scripts/measure_projective_observables.py /tmp/cubo6d_strong_quantum.pt --pairs adjacent
+
+Salida esperada de estructura:
+
+    normalization_error ~= 0
+    magnetization_z = ...
+    <Z_0> = ...
+    <Z_0Z_1> = ...
+    sector_mass_u_count_0 = ...
+    sector_mass_u_count_6 = ...
+
+Estos observables convierten la familia proyectiva Q_sigma(Xi_solution) en magnitudes fisicas estructuradas sin abandonar la carta u/p.
 
 ## API de lectura proyectiva
 

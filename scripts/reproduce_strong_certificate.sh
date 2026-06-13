@@ -35,3 +35,5 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
   puupup
 
 "$PY" scripts/audit_strong_certificate.py "$STATE"
+
+"$PY" scripts/measure_projective_observables.py "$STATE" --pairs adjacent
