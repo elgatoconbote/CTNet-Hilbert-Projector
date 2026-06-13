@@ -49,3 +49,11 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
   pppppp \
   upupup \
   puupup
+
+"$PY" scripts/measure_projective_density.py \
+  "$STATE" \
+  uuuuuu \
+  pppppp \
+  upupup \
+  puupup \
+  --pairs adjacent

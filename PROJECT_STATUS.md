@@ -162,6 +162,9 @@ Criterio de exito:
     scripts/measure_projective_coherence_matrix.py
         Matriz relacional de coherencia cardinal.
 
+    scripts/measure_projective_density.py
+        Densidad proyectiva D_proj(n): estructura proyectiva por unidad de amplitud materializada.
+
 ## Lecturas soportadas
 
     A(sigma)
@@ -199,6 +202,9 @@ Criterio de exito:
 
     coherence_matrix(sigma,tau)
         mapa relacional de fase e interferencia sobre ramas seleccionadas
+
+    D_proj(n)
+        densidad de lectura estructural proyectiva frente a amplitudes materializadas
 
 ## Observables validados
 
@@ -302,6 +308,41 @@ Interpretacion:
 
 La matriz separa masa diagonal, interferencia real y orientacion relacional de fase. Esto convierte lecturas de amplitud por rama en un mapa cardinal de coherencia.
 
+## Densidad proyectiva D_proj(n)
+
+Definicion operativa:
+
+    D_proj(n) =
+        projective_structural_scalars
+        /
+        full_amplitude_scalars
+
+con:
+
+    full_amplitude_scalars = 2 * 2^n
+
+y:
+
+    projective_structural_scalars =
+        branch_readout_scalars
+        + diagonal_observable_scalars
+        + coherence_matrix_scalars
+        + audit_certificate_scalars
+
+Resultado validado para n=6 con cuatro ramas seleccionadas:
+
+    projective_structural_scalars = 131
+    full_amplitude_scalars = 128
+    D_proj_per_full_amplitude_scalar = 1.0234375
+    D_proj_per_complex_amplitude = 2.046875
+    D_proj_per_selected_branch = 32.75
+
+Interpretacion:
+
+D_proj(n) mide cuanta estructura proyectiva, observable, relacional y auditable se obtiene alrededor de Q_sigma(Xi) por unidad de amplitud compleja materializada externamente.
+
+No sustituye al certificado fuerte. Lo complementa como metrica de densidad estructural.
+
 ## Commits funcionales recientes
 
     b284a44 Add plateau stop for Cubo 6D closure
@@ -332,14 +373,15 @@ Bloque funcional cerrado:
     phase/interference measurement
     +
     projective coherence matrix
+    +
+    projective density D_proj(n)
 
 ## Proximos hitos
 
-1. Densidad proyectiva D_proj(n).
-2. Barrido de ramas para mapa de coherencia ampliado.
-3. Observables no diagonales efectivos en carta u/p.
-4. Entrelazamiento como no separabilidad relacional.
-5. Segundo modelo: Heisenberg XXZ.
-6. Tercer modelo: Fermi-Hubbard.
-7. Benchmark de coste efectivo por amplitud definida.
-8. Comparativa frente a reconstruccion/tomografia Hilbert externa.
+1. Barrido de ramas para mapa de coherencia ampliado.
+2. Observables no diagonales efectivos en carta u/p.
+3. Entrelazamiento como no separabilidad relacional.
+4. Segundo modelo: Heisenberg XXZ.
+5. Tercer modelo: Fermi-Hubbard.
+6. Benchmark de coste efectivo por amplitud definida.
+7. Comparativa frente a reconstruccion/tomografia Hilbert externa.

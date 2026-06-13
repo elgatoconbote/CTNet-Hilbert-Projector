@@ -204,6 +204,47 @@ y la parte antisimetrica de cuadratura registra orientacion relacional de fase e
 
 Esta herramienta convierte las lecturas de fase por pares en un mapa de coherencia cardinal sobre la familia proyectiva.
 
+## Densidad proyectiva D_proj(n)
+
+La densidad proyectiva mide cuanta estructura se obtiene desde el estado proyectivo por unidad de amplitud materializada.
+
+    $PY scripts/measure_projective_density.py \
+      /tmp/cubo6d_strong_quantum.pt \
+      uuuuuu \
+      pppppp \
+      upupup \
+      puupup \
+      --pairs adjacent
+
+Definicion operativa:
+
+    D_proj(n) =
+        projective_structural_scalars
+        /
+        full_amplitude_scalars
+
+donde:
+
+    full_amplitude_scalars = 2 * 2^n
+
+y:
+
+    projective_structural_scalars =
+        branch_readout_scalars
+      + diagonal_observable_scalars
+      + coherence_matrix_scalars
+      + audit_certificate_scalars
+
+Resultado validado para n=6 con cuatro ramas seleccionadas:
+
+    projective_structural_scalars = 131
+    full_amplitude_scalars = 128
+    D_proj_per_full_amplitude_scalar = 1.0234375
+    D_proj_per_complex_amplitude = 2.046875
+    D_proj_per_selected_branch = 32.75
+
+Esta metrica no sustituye al certificado. Mide densidad de lectura estructural: cuanta informacion proyectiva, observable, relacional y auditable se obtiene alrededor de la familia Q_sigma(Xi).
+
 ## API de lectura proyectiva
 
 El lector permite consultar:
