@@ -141,6 +141,49 @@ def read_q_sigma(state: FoldedOmegaCuboState, n: int) -> torch.Tensor:
     return amp / amp.norm().clamp_min(1e-15)
 
 
+def read_phi_cubo(state: FoldedOmegaCuboState) -> torch.Tensor:
+    """Read global Cubo phase phi directly from Xi_solution.
+
+    Phi is a scalar modal phase projected only from C6/theta15/gates/Z/M/R/pad.
+    """
+    dtype = torch.float64
+    device = state.z.device
+
+    c = state.cubo[0].to(device=device, dtype=dtype)
+    z = state.z[0].to(device=device, dtype=dtype)
+    m = state.memory[0].to(device=device, dtype=dtype)
+    r = state.relations[0].to(device=device, dtype=dtype)
+    pad = state.pad[0].to(device=device, dtype=dtype) if state.pad.numel() else torch.zeros(0, device=device, dtype=dtype)
+
+    s6 = c[:6] * 3.0
+    theta15 = c[6:21] * torch.pi
+    residual = c[21]
+    absorption = c[22]
+    omega = c[23]
+    closure_score = c[24]
+    gates = c[25:29]
+
+    modal_charge = (s6 - s6.mean()).sum()
+    theta_charge = torch.sin(theta15).sum() + torch.cos(theta15).sum()
+    state_charge = z.mean() + 0.5 * m.mean() + 0.5 * r.mean()
+    pad_charge = pad.mean() if pad.numel() else torch.zeros((), device=device, dtype=dtype)
+    gate_charge = gates.mean()
+
+    raw_phi = (
+        theta_charge
+        + 0.25 * modal_charge
+        + state_charge
+        + 0.10 * pad_charge
+        + 0.50 * gate_charge
+        + closure_score
+        + absorption
+        - residual
+        - omega
+    )
+
+    return torch.atan2(torch.sin(raw_phi), torch.cos(raw_phi))
+
+
 def evaluate_candidate(
     model: FoldedCTNetOmegaCubo26,
     prev: FoldedOmegaCuboState,
@@ -242,6 +285,9 @@ def main() -> None:
     final_obs = model.cubo_observation(solution)
     final_up, final_up_metrics = all_perspective_up_loss(model, state0, solution)
     amp = read_q_sigma(solution, args.n)
+    phi = read_phi_cubo(solution)
+    eiphi = torch.exp(1j * phi.to(torch.complex128))
+    amp_with_phi = eiphi * amp
     norm_error = (amp.abs().pow(2).sum() - 1.0).abs()
 
     print("=== Cubo 6D only quantum chart solver ===")
@@ -273,6 +319,10 @@ def main() -> None:
 
     print(f"amplitude_count={amp.numel()}")
     print(f"normalization_error={float(norm_error.detach().cpu()):.12g}")
+    print(f"phi_cubo_rad={float(phi.detach().cpu()):.17g}")
+    print(f"phi_cubo_over_pi={float((phi / torch.pi).detach().cpu()):.17g}")
+    print(f"eiphi_real={float(eiphi.real.detach().cpu()):.17g}")
+    print(f"eiphi_imag={float(eiphi.imag.detach().cpu()):.17g}")
     print("first_amplitudes:")
 
     for i, a in enumerate(amp[: min(16, amp.numel())].detach().cpu()):
@@ -291,6 +341,11 @@ def main() -> None:
                 "psi0": psi0,
                 "solver": "Cubo_6D_only",
                 "normalization_error": float(norm_error.detach().cpu()),
+                "phi_cubo_rad": float(phi.detach().cpu()),
+                "phi_cubo_over_pi": float((phi / torch.pi).detach().cpu()),
+                "eiphi_real": float(eiphi.real.detach().cpu()),
+                "eiphi_imag": float(eiphi.imag.detach().cpu()),
+                "amplitudes_with_phi": amp_with_phi.detach().cpu(),
                 "final_omega": float(final_obs["omega"].mean().detach().cpu()),
                 "final_up_total": float(final_up.detach().cpu()),
             },
