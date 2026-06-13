@@ -12,6 +12,8 @@ Tambien descrito como:
 
 El proyecto tiene cerrado un bloque funcional completo para la instancia Ising transverse-field n=6 en base cardinal u/p.
 
+El repositorio es autosuficiente: contiene el nucleo CTNet/Cubo 6D local, el puente Observador -> batch_to_state y shims de compatibilidad para los imports historicos. La reproduccion fuerte no requiere ejecutarse desde una carpeta hermana ni depender de ningun repositorio externo.
+
 El estado actual no es solo un primer certificado. La ruta ya es:
 
     reproducible
@@ -29,6 +31,7 @@ La reproduccion oficial ejecuta:
     observables diagonales
     fase/interferencia por pares
     matriz de coherencia proyectiva
+    densidad proyectiva D_proj(n)
 
 ## Tesis practica
 
@@ -124,14 +127,14 @@ La carta Cubo 6D alcanza una orbita de cierre de dos ciclos alrededor del minimo
 
 ## Reproduccion oficial
 
-Comando unico:
+Comando unico autosuficiente:
 
-    PY=/home/elgatoconbote/CTNet-Omega-cubo-6D/.venv/bin/python \
-    STATE=/tmp/cubo6d_strong_quantum.pt \
-    scripts/reproduce_strong_certificate.sh
+    Ver STANDALONE.md para la instalacion local.
+    Comando de reproduccion: STATE=/tmp/cubo6d_strong_quantum.pt PY=python3 scripts/reproduce_strong_certificate.sh
 
 Criterio de exito:
 
+    18 passed
     tests passed
     quantum_strong_certified=True
     CERTIFICATE_OK=True
@@ -144,8 +147,21 @@ Criterio de exito:
     examples/solve_ising_cubo6d_only.py
         Solver Cubo-only para la instancia Ising u/p certificada.
 
+    src/ctnet_hilbert_projector/ctnet_omega_core.py
+        Nucleo CTNet/Cubo 6D local empaquetado en el propio repositorio.
+
+    src/ctnet_hilbert_projector/observer_bridge.py
+        Puente autosuficiente Observador -> batch_to_state -> Xi y perdida u=p multiescala.
+
     src/ctnet_hilbert_projector/projective_engine.py
         API de lectura proyectiva A(sigma), P(sigma), Theta(sigma), DeltaTheta y certificate.
+
+    ctnet_omega_cubo6d_plegado_ctnet26.py
+    train_vram_up_coherence_ctnet.py
+        Shims de compatibilidad para conservar imports historicos sin dependencia externa.
+
+    STANDALONE.md
+        Guia de reproduccion autosuficiente.
 
     scripts/audit_strong_certificate.py
         Auditoria independiente del artefacto .pt.
@@ -353,6 +369,11 @@ No sustituye al certificado fuerte. Lo complementa como metrica de densidad estr
     c58e433 Document projective observables in reproduction flow
     4d7db25 Add projective phase interference measurement
     00c6833 Add projective coherence matrix measurement
+    54be1e6 Add standalone CTNet observer bridge
+    085cfe0 Add standalone CTNet Omega Cubo compatibility shim
+    8af9b92 Add standalone observer bridge compatibility shim
+    4350cce Make strong certificate reproduction standalone
+    bd53bcc Document standalone reproduction
 
 ## Estado del bloque
 
@@ -375,6 +396,10 @@ Bloque funcional cerrado:
     projective coherence matrix
     +
     projective density D_proj(n)
+    +
+    standalone CTNet/Cubo 6D local core
+    +
+    external-folder-free reproduction
 
 ## Proximos hitos
 
