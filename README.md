@@ -99,6 +99,36 @@ El certificado no depende de un oraculo Hilbert externo. La solucion se lee desd
     PROJECT_STATUS.md
         Estado formal del primer hito cerrado.
 
+## Reproduccion fuerte en un comando
+
+La ruta completa de reproduccion ejecuta compilacion, tests, solver Cubo-only, lectura proyectiva y auditoria independiente del artefacto `.pt`.
+
+    PY=/home/elgatoconbote/CTNet-Omega-cubo-6D/.venv/bin/python \
+    STATE=/tmp/cubo6d_strong_quantum.pt \
+    scripts/reproduce_strong_certificate.sh
+
+Criterio de exito esperado:
+
+    7 passed
+    closure_steps_used=24
+    quantum_strong_certified=True
+    CERTIFICATE_OK=True
+    amplitude_count=64
+    expected_amplitude_count=64
+    Omega_6D=0
+    Omega_Q=1.90802765587e-07
+    epsilon_A=7.9060427538e-08
+    epsilon_P=1.11742338049e-07
+    normalization_error=2.220446049250313e-16
+
+La reproduccion queda dividida en tres capas auditables:
+
+    solver      -> genera /tmp/cubo6d_strong_quantum.pt
+    readout     -> consulta Q_sigma(Xi_solution)
+    auditoria   -> verifica el certificado desde el .pt
+
+Esto permite validar el hito fuerte sin depender de inspeccion manual del log del solver.
+
 ## API de lectura proyectiva
 
 El lector permite consultar:
