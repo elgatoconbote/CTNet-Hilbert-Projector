@@ -74,3 +74,27 @@ certificate   resumen del certificado
 4. Observables internos
 5. Correlaciones C_ij
 6. Entrelazamiento como no separabilidad relacional
+
+## Mejora de cierre: parada por meseta
+
+Se ha añadido parada por meseta/oscilación en solve_with_cubo.
+
+Resultado validado en la instancia certificada:
+
+closure_steps_used = 24
+
+El certificado fuerte permanece intacto:
+
+quantum_strong_certified = True
+Omega_6D = 0.0
+Omega_Q = 1.90802765587e-07
+epsilon_A = 7.9060427538e-08
+epsilon_P = 1.11742338049e-07
+phase_error = 0.0
+exhaustive_error = 0.0
+closure_error = 0.0
+normalization_error = 2.220446049250313e-16
+
+Interpretacion:
+
+La carta Cubo 6D alcanza una orbita de cierre de dos ciclos alrededor del minimo operativo de omega_eff. La parada por meseta evita gastar pasos de cierre sin perdida de exactitud cuantica certificada.

@@ -379,19 +379,35 @@ def solve_with_cubo(
     history: list[CuboCandidate] = []
     current = state
 
+    best_eff = float("inf")
+    stale_steps = 0
+    plateau_patience = 4
+    min_delta = 1e-12
+
     for _ in range(max(1, closure_steps)):
         candidates = [
             evaluate_candidate(model, current, cand, name=name, q=q, lambda_up=lambda_up, lambda_q=lambda_q)
             for name, cand in cubo_step_candidates(model, current, q, q_shear=q_shear)
         ]
         chosen = min(candidates, key=lambda c: float(c.omega_eff.detach().cpu()))
+        chosen_eff = float(chosen.omega_eff.detach().cpu())
+
         history.append(chosen)
         current = chosen.state
-        if float(chosen.omega_eff.detach().cpu()) <= tau:
+
+        if chosen_eff <= tau:
+            break
+
+        if chosen_eff + min_delta < best_eff:
+            best_eff = chosen_eff
+            stale_steps = 0
+        else:
+            stale_steps += 1
+
+        if stale_steps >= plateau_patience:
             break
 
     return current, history
-
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cubo 6D only solver for an Ising u/p chart")
