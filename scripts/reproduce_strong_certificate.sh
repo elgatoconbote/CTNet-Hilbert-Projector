@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PY="${PY:-/home/elgatoconbote/CTNet-Omega-cubo-6D/.venv/bin/python}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+PY="${PY:-python}"
 STATE="${STATE:-/tmp/cubo6d_strong_quantum.pt}"
 
-export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
+export PYTHONPATH="$ROOT/src:${PYTHONPATH:-}"
 
 "$PY" -m py_compile examples/solve_ising_cubo6d_only.py
+"$PY" -m py_compile src/ctnet_hilbert_projector/ctnet_omega_core.py
+"$PY" -m py_compile src/ctnet_hilbert_projector/observer_bridge.py
 "$PY" -m py_compile src/ctnet_hilbert_projector/projective_engine.py
 "$PY" -m py_compile scripts/audit_strong_certificate.py
 "$PY" -m pytest -q
