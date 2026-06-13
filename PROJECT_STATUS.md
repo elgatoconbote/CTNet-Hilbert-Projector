@@ -1,8 +1,20 @@
-# CTNet Hilbert Projector: estado del hito
+# CTNet Hilbert Projector - primer hito cerrado
 
-## Hito cerrado
+## Producto
 
-Primer simulador cuántico estructural CTNet/Cubo 6D en base u/p con lectura amplitud-por-amplitud.
+CTNet Hilbert Projector
+
+Tambien descrito como:
+
+CTNet-(u/p) Quantum Projective Simulator
+
+## Tesis practica
+
+El estado cuantico no se trata primariamente como una tabla plana de amplitudes, sino como una familia proyectiva generada desde un estado persistente CTNet/Cubo 6D.
+
+A_t(sigma) = Q_sigma(Xi_t)
+
+sigma pertenece a {u,p}^n
 
 ## Ruta certificada
 
@@ -15,51 +27,50 @@ P_Q
 -> Omega_Q
 -> u=p
 -> Q_sigma(Xi_solution)
+-> A_t(sigma)
 
 ## Instancia certificada
 
-- Modelo: Ising transverse-field 1D
-- n: 6
-- J: 1.0
-- h: 0.5
-- dt: 0.05
-- steps: 3
-- psi0: uuuuuu
+modelo = Ising transverse-field 1D
+n = 6
+J = 1.0
+h = 0.5
+dt = 0.05
+steps = 3
+psi0 = uuuuuu
 
-## Certificado
+## Certificado fuerte
 
-- quantum_strong_certified: True
-- Omega_6D: 0.0
-- Omega_Q: 1.90802765587e-07
-- epsilon_A: 7.9060427538e-08
-- epsilon_P: 1.11742338049e-07
-- phase_error: 0.0
-- exhaustive_error: 0.0
-- closure_error: 0.0
-- normalization_error: 2.220446049250313e-16
+quantum_strong_certified = True
+Omega_6D = 0.0
+Omega_Q = 1.90802765587e-07
+epsilon_A = 7.9060427538e-08
+epsilon_P = 1.11742338049e-07
+phase_error = 0.0
+exhaustive_error = 0.0
+closure_error = 0.0
+normalization_error = 2.220446049250313e-16
 
-## Regla de arquitectura
+## Fase Cubo
 
-El solver no usa rutas externas de evolución exacta, matriz exponencial, vector Hilbert externo ni oráculo de comparación. La solución se lee como familia proyectiva:
+phi_cubo_rad = 2.253564349891881
+phi_cubo_over_pi = 0.7173318117219329
+eiphi_real = -0.6309429516256336
+eiphi_imag = 0.7758292284993736
 
-A_t(sigma) = Q_sigma(Xi_t)
+## Lecturas soportadas
 
-## Producto
+A(sigma)      amplitud compleja
+P(sigma)      probabilidad Born
+Theta(sigma)  fase de rama
+DeltaTheta    diferencia de fase entre ramas
+certificate   resumen del certificado
 
-Nombre operativo:
+## Proximos modelos
 
-CTNet Hilbert Projector
-
-Nombre descriptivo:
-
-CTNet-(u/p) Quantum Projective Simulator
-
-## Siguiente expansión
-
-1. API de consulta: A(sigma), P(sigma), Theta(sigma)
-2. Observables internos
-3. Correlaciones C_ij
-4. Entrelazamiento como no separabilidad relacional
-5. Segundo modelo: Heisenberg XXZ
-6. Tercer modelo: Fermi-Hubbard
-7. Benchmark de coste efectivo D_proj(n)
+1. Heisenberg XXZ
+2. Fermi-Hubbard
+3. Benchmark de densidad proyectiva D_proj(n)
+4. Observables internos
+5. Correlaciones C_ij
+6. Entrelazamiento como no separabilidad relacional
