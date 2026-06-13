@@ -37,3 +37,8 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
 "$PY" scripts/audit_strong_certificate.py "$STATE"
 
 "$PY" scripts/measure_projective_observables.py "$STATE" --pairs adjacent
+
+"$PY" scripts/measure_projective_phase.py \
+  "$STATE" \
+  uuuuuu:pppppp \
+  upupup:puupup

@@ -147,6 +147,36 @@ Salida esperada de estructura:
 
 Estos observables convierten la familia proyectiva Q_sigma(Xi_solution) en magnitudes fisicas estructuradas sin abandonar la carta u/p.
 
+## Fase e interferencia proyectiva
+
+La fase de rama y la interferencia cardinal se auditan por pares de ramas:
+
+    $PY scripts/measure_projective_phase.py \
+      /tmp/cubo6d_strong_quantum.pt \
+      uuuuuu:pppppp \
+      upupup:puupup
+
+La salida incluye:
+
+    Theta(sigma)
+    Theta(tau)
+    DeltaTheta(sigma,tau)
+    cos_DeltaTheta
+    sin_DeltaTheta
+    sqrt_P_sigma_P_tau
+    interference_kernel
+    quadrature_kernel
+
+El nucleo de interferencia se calcula como:
+
+    interference_kernel = sqrt(P_sigma P_tau) * cos(DeltaTheta)
+
+y la cuadratura como:
+
+    quadrature_kernel = sqrt(P_sigma P_tau) * sin(DeltaTheta)
+
+Esta capa conecta fase reversible de rama con interferencia cardinal medible desde el mismo estado proyectivo.
+
 ## API de lectura proyectiva
 
 El lector permite consultar:
