@@ -177,6 +177,33 @@ y la cuadratura como:
 
 Esta capa conecta fase reversible de rama con interferencia cardinal medible desde el mismo estado proyectivo.
 
+## Matriz de coherencia proyectiva
+
+Los pares de interferencia pueden elevarse a una matriz relacional sobre un conjunto finito de ramas:
+
+    $PY scripts/measure_projective_coherence_matrix.py \
+      /tmp/cubo6d_strong_quantum.pt \
+      uuuuuu \
+      pppppp \
+      upupup \
+      puupup
+
+La matriz devuelve, para cada par ordenado sigma,tau:
+
+    DeltaTheta(sigma,tau)
+    cos_DeltaTheta(sigma,tau)
+    sin_DeltaTheta(sigma,tau)
+    interference_kernel(sigma,tau)
+    quadrature_kernel(sigma,tau)
+
+La diagonal recupera la masa de cada rama como interferencia consigo misma:
+
+    interference_kernel(sigma,sigma) = P_sigma
+
+y la parte antisimetrica de cuadratura registra orientacion relacional de fase entre ramas.
+
+Esta herramienta convierte las lecturas de fase por pares en un mapa de coherencia cardinal sobre la familia proyectiva.
+
 ## API de lectura proyectiva
 
 El lector permite consultar:

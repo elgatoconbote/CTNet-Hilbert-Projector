@@ -42,3 +42,10 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
   "$STATE" \
   uuuuuu:pppppp \
   upupup:puupup
+
+"$PY" scripts/measure_projective_coherence_matrix.py \
+  "$STATE" \
+  uuuuuu \
+  pppppp \
+  upupup \
+  puupup
