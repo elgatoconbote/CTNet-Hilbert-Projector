@@ -216,7 +216,7 @@ def is_formal_certified_case(q: QuantumProblem) -> bool:
     )
 
 
-def certified_problem_constants(q: QuantumProblem, *, device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def certified_problem_constants(q: QuantumProblem, *, device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, bool]:
     dtype = torch.float64
 
     if is_formal_certified_case(q):
@@ -224,13 +224,17 @@ def certified_problem_constants(q: QuantumProblem, *, device: torch.device) -> t
         eps_p = torch.tensor(1.11742338049e-7, device=device, dtype=dtype)
         omega_q = torch.tensor(1.90802765587e-7, device=device, dtype=dtype)
         closure_score = torch.tensor(0.999999821186, device=device, dtype=dtype)
+        has_certificate = True
     else:
-        eps_a = torch.tensor(float("inf"), device=device, dtype=dtype)
-        eps_p = torch.tensor(float("inf"), device=device, dtype=dtype)
-        omega_q = torch.tensor(float("inf"), device=device, dtype=dtype)
+        # Runtime exploration must remain finite outside the audited benchmark.
+        # NaN means "not formally certified", not "infinite physical defect".
+        eps_a = torch.tensor(float("nan"), device=device, dtype=dtype)
+        eps_p = torch.tensor(float("nan"), device=device, dtype=dtype)
+        omega_q = torch.tensor(float("nan"), device=device, dtype=dtype)
         closure_score = torch.tensor(0.0, device=device, dtype=dtype)
+        has_certificate = False
 
-    return eps_a, eps_p, omega_q, closure_score
+    return eps_a, eps_p, omega_q, closure_score, has_certificate
 
 
 def quantum_structural_defect(
@@ -246,7 +250,7 @@ def quantum_structural_defect(
     norm_error = (amp.abs().pow(2).sum() - 1.0).abs().real.to(torch.float64)
     born_error = (amp_phi.abs().pow(2).sum() - 1.0).abs().real.to(torch.float64)
 
-    eps_a, eps_p, omega_q_cert, _closure_score_cert = certified_problem_constants(q, device=amp.device)
+    eps_a, eps_p, omega_q_cert, _closure_score_cert, has_certificate = certified_problem_constants(q, device=amp.device)
 
     exhaustive_error = torch.tensor(0.0 if amp.numel() == 2**q.n else 1.0, device=amp.device, dtype=torch.float64)
     phase_error = torch.tensor(0.0 if torch.isfinite(phi).item() else 1.0, device=amp.device, dtype=torch.float64)
@@ -259,18 +263,20 @@ def quantum_structural_defect(
         one = torch.tensor(1.0, device=amp.device, dtype=torch.float64)
         closure_error = omega_6d + torch.relu(one - closure_score)
 
-    omega_q = torch.maximum(
-        omega_q_cert,
-        torch.stack(
-            [
-                norm_error,
-                born_error,
-                exhaustive_error,
-                phase_error,
-                closure_error,
-            ]
-        ).max(),
-    )
+    runtime_omega_q = torch.stack(
+        [
+            norm_error,
+            born_error,
+            exhaustive_error,
+            phase_error,
+            closure_error,
+        ]
+    ).max()
+
+    if has_certificate:
+        omega_q = torch.maximum(omega_q_cert, runtime_omega_q)
+    else:
+        omega_q = runtime_omega_q
 
     return QuantumDefect(
         omega_q=omega_q,
@@ -408,6 +414,7 @@ def solve_with_cubo(
             break
 
     return current, history
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cubo 6D only solver for an Ising u/p chart")
