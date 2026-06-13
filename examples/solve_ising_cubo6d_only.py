@@ -529,11 +529,18 @@ def main() -> None:
 
     if args.save:
         path = Path(args.save)
+        best_omega_eff = min((float(item.omega_eff.detach().cpu()) for item in history), default=float("nan"))
+        last_omega_eff = float(history[-1].omega_eff.detach().cpu()) if history else float("nan")
+        last_candidate = history[-1].name if history else ""
         torch.save(
             {
                 "amplitudes": amp.detach().cpu(),
                 "amplitudes_with_phi": amp_with_phi.detach().cpu(),
                 "n": q.n,
+                "closure_steps_used": len(history),
+                "best_omega_eff": best_omega_eff,
+                "last_omega_eff": last_omega_eff,
+                "last_candidate": last_candidate,
                 "J": q.J,
                 "h": q.h,
                 "dt": q.dt,
