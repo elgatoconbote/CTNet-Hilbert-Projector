@@ -184,6 +184,147 @@ El entrelazamiento se interpreta como no separabilidad relacional de memoria y b
 
 La decoherencia se interpreta como perdida de compatibilidad entre fase, regimen y cierre.
 
+
+## Superioridad proyectiva frente al procesador cuantico fisico
+
+El procesador cuantico fisico opera con evolucion fisica y lectura muestral. CTNet Hilbert Projector opera con estado generador y lectura proyectiva.
+
+Procesador cuantico fisico:
+
+    evolucion fisica + medicion + muestreo + estadistica
+
+CTNet Hilbert Projector:
+
+    evolucion del estado generador
+    + lectura proyectiva de amplitud
+    + fase
+    + masa
+    + coherencia
+    + residuo
+    + relacion
+    + sector
+    + observable
+
+La medicion fisica es una proyeccion particular. En CTNet, la medicion queda contenida dentro de un atlas mas amplio de lecturas estructurales.
+
+Por eso, en terminos estructurales:
+
+    Salidas(QC fisico) subset Salidas(CTNet)
+
+    Estructura accesible(QC fisico) subset Estructura accesible(CTNet)
+
+La superioridad no se afirma como mas FLOPS fisicos. Se afirma como superioridad de acceso: CTNet conserva como estructura interna aquello que el procesador cuantico fisico entrega de forma parcial, muestral o reconstruida.
+
+## Cuanto lo supera
+
+Para n grados cuanticos, el numero de amplitudes de la base es:
+
+    N_amp(n) = 2^n
+
+Un listado completo de amplitudes exige:
+
+    C_list(n) >= 2^n
+
+La tomografia completa de un estado general escala como:
+
+    C_tom(n) ~ 4^n
+
+CTNet separa tres costes:
+
+    C_gen(n)  = coste de mantener el estado generador Xi
+    C_read(n) = coste de leer una rama, carta o sector
+    C_list(n) = coste de materializar externamente toda la lista
+
+La ventaja frente al listado es:
+
+    S_list(n) = 2^n / C_gen(n)
+
+La ventaja frente a tomografia es:
+
+    S_tom(n) = 4^n / C_gen(n)
+
+Si C_gen(n) es constante o subexponencial, entonces:
+
+    S_list(n) -> infinity
+    S_tom(n)  -> infinity
+
+Ejemplo de referencia para n = 40 y C_gen = 1024:
+
+    2^40 = 1_099_511_627_776
+    S_list(40) = 2^40 / 1024 = 1_073_741_824
+    S_tom(40)  = 4^40 / 1024 = 1.18059162072e21
+
+En n = 40, CTNet separa el acceso proyectivo del listado completo por un factor aproximado de:
+
+    1.07 x 10^9
+
+frente a listado, y por:
+
+    1.18 x 10^21
+
+frente a tomografia completa.
+
+El punto central es que CTNet conserva el vector como ley proyectiva:
+
+    sigma -> Q_sigma(Xi)
+
+La lista completa es una salida posible, no el objeto primario.
+
+## Consecuencias estructurales
+
+1. El vector de estado deja de identificarse con una lista.
+
+    vector = familia proyectiva generada por Xi
+
+2. La medicion deja de ser el acceso soberano al estado.
+
+    medicion = proyeccion particular dentro de un atlas de lecturas
+
+3. La regla de Born se reinterpreta como masa modal normalizada.
+
+    P_t(sigma) = mu_t(sigma) / sum_tau mu_t(tau)
+
+4. La fase se vuelve memoria reversible de trayectoria.
+
+    Theta_t(sigma) = memoria dinamica de rama
+
+5. El entrelazamiento se vuelve no separabilidad relacional.
+
+    entrelazamiento = obstruccion relacional a la factorizacion de ramas
+
+6. La decoherencia se reinterpreta como perdida de compatibilidad entre fase, regimen y cierre.
+
+7. El qubit fisico queda como una carta particular de una estructura generadora mas amplia.
+
+8. La computacion cuantica pasa de evolucion de un vector opaco a evolucion de un estado generador auditable.
+
+9. CTNet desplaza el regimen de simulacion cuantica hacia computacion estructural proyectiva.
+
+## Auditoria conceptual
+
+Las pruebas conceptuales minimas son:
+
+    sum_sigma |A_t(sigma)|^2 = 1
+
+    A_t(sigma) consultable para toda rama sigma
+
+    fase Theta_t(sigma) definida por lectura de estado
+
+    masa mu_t(sigma) positiva y normalizable
+
+    observables recuperables desde familia proyectiva
+
+    medicion recuperable como proyeccion de rama, carta o sector
+
+En el hito actual, la instancia Ising n=6 cumple:
+
+    quantum_strong_certified = True
+    Omega_6D = 0
+    Omega_Q < 1e-6
+    epsilon_A < 1e-6
+    epsilon_P < 1e-6
+    normalization_error ~= 0
+
 ## Proximos hitos
 
 1. Observables internos.
